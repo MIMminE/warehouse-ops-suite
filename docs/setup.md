@@ -32,12 +32,18 @@ pnpm dev:pdf
 ## Run Kotlin Services
 
 ```bash
-gradle :services:api-server:bootRun --args='--spring.profiles.active=smoke'
+gradle :services:api-server:bootRun
 gradle :apps:print-agent:run
 gradle :apps:dps-protocol-agent:run
 ```
 
-The default API Server profile expects PostgreSQL from Docker Compose. The `smoke` profile uses in-memory H2 so the server process can be checked without Docker.
+The default API Server profile is `local` and expects PostgreSQL from Docker Compose. The `smoke` profile uses in-memory H2 so the server process can be checked without Docker.
+
+```bash
+gradle :services:api-server:bootRun --args='--spring.profiles.active=smoke'
+```
+
+For AWS-oriented runtime settings, see [aws-deployment.md](aws-deployment.md).
 
 ## Prepare Flutter PDA App
 
