@@ -7,6 +7,12 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface InventoryRepository : JpaRepository<InventoryEntity, Long> {
+    fun findByClientCompanyIdAndLocationIdAndSkuId(
+        clientCompanyId: Long,
+        locationId: Long,
+        skuId: Long,
+    ): InventoryEntity?
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """

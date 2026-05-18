@@ -4,5 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface PutawayTaskRepository : JpaRepository<PutawayTaskEntity, Long> {
     fun existsByTaskNo(taskNo: String): Boolean
-}
 
+    fun findByReceivingOrderLineId(receivingOrderLineId: Long): List<PutawayTaskEntity>
+}
