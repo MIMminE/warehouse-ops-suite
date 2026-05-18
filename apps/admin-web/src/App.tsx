@@ -118,6 +118,18 @@ type PickingRow = {
   status: string;
 };
 
+type InvoiceRow = {
+  outboundNo: string;
+  invoiceNo: string;
+  sku: string;
+  product: string;
+  quantity: number;
+  allocated: number;
+  picked: number;
+  carrier: string;
+  printStatus: string;
+};
+
 const navItems: Array<{ id: AdminSection; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "운영 현황", icon: LayoutDashboard },
   { id: "receiving", label: "입고/적치", icon: PackageCheck },
@@ -301,6 +313,16 @@ const outboundRows: OutboundRow[] = [
   },
 ];
 
+const outboundInvoiceRows: InvoiceRow[] = [
+  { outboundNo: "OUT-20260518-0801", invoiceNo: "INV-260518-0001", sku: "SKU-4012", product: "Basic Tee / Black", quantity: 2, allocated: 2, picked: 2, carrier: "CJ대한통운", printStatus: "출력완료" },
+  { outboundNo: "OUT-20260518-0801", invoiceNo: "INV-260518-0002", sku: "SKU-1024", product: "Slim Bottle / Clear", quantity: 1, allocated: 1, picked: 1, carrier: "CJ대한통운", printStatus: "출력대기" },
+  { outboundNo: "OUT-20260518-0801", invoiceNo: "INV-260518-0003", sku: "SKU-7780", product: "Pouch Set / Gray", quantity: 3, allocated: 3, picked: 0, carrier: "롯데택배", printStatus: "출력대기" },
+  { outboundNo: "OUT-20260518-0802", invoiceNo: "INV-260518-0004", sku: "SKU-8801", product: "Daily Cap / Navy", quantity: 1, allocated: 1, picked: 0, carrier: "한진택배", printStatus: "미생성" },
+  { outboundNo: "OUT-20260518-0802", invoiceNo: "INV-260518-0005", sku: "SKU-4012", product: "Basic Tee / Black", quantity: 4, allocated: 2, picked: 0, carrier: "한진택배", printStatus: "미생성" },
+  { outboundNo: "OUT-20260518-0803", invoiceNo: "INV-260519-0006", sku: "SKU-7780", product: "Pouch Set / Gray", quantity: 6, allocated: 3, picked: 0, carrier: "CJ대한통운", printStatus: "보류" },
+  { outboundNo: "OUT-20260519-0804", invoiceNo: "INV-260519-0007", sku: "SKU-1024", product: "Slim Bottle / Clear", quantity: 2, allocated: 2, picked: 2, carrier: "우체국택배", printStatus: "출력완료" },
+];
+
 const pickingRows: PickingRow[] = [
   {
     wave: "WAVE-0518-AM-01",
@@ -346,7 +368,6 @@ const agentRows = [
 
 export function App() {
   const [section, setSection] = useState<AdminSection>("dashboard");
-  const [filters, setFilters] = useState<OperationFilters>(defaultFilters);
 
   const title = useMemo(() => navItems.find((item) => item.id === section)?.label ?? "운영 현황", [section]);
 
@@ -399,14 +420,11 @@ export function App() {
           </header>
 
           <div className="grid gap-5 p-6 max-sm:p-4">
-            {section !== "dps" && section !== "agents" && (
-              <OperationFilterBar filters={filters} onChange={setFilters} statusOptions={statusOptionsFor(section)} />
-            )}
-            {section === "dashboard" && <Dashboard filters={filters} />}
-            {section === "receiving" && <ReceivingView filters={filters} />}
-            {section === "inventory" && <InventoryView filters={filters} />}
-            {section === "outbound" && <OutboundView filters={filters} />}
-            {section === "picking" && <PickingView filters={filters} />}
+            {section === "dashboard" && <Dashboard />}
+            {section === "receiving" && <ReceivingView />}
+            {section === "inventory" && <InventoryView />}
+            {section === "outbound" && <OutboundView />}
+            {section === "picking" && <PickingView />}
             {section === "dps" && <DpsMonitor />}
             {section === "agents" && <AgentsView />}
           </div>
@@ -416,58 +434,24 @@ export function App() {
   );
 }
 
-function Dashboard({ filters }: { filters: OperationFilters }) {
-  const receiving = filterByOperation(receivingRows, filters, (row) => row.expectedDate, [
-    "no",
-    "client",
-    "warehouse",
-    "sku",
-    "product",
-    "supplier",
-    "status",
-  ]);
-  const inventory = filterByOperation(inventoryRows, filters, (row) => row.lastMovedAt, [
-    "sku",
-    "name",
-    "client",
-    "warehouse",
-    "location",
-    "lot",
-    "status",
-  ]);
-  const outbound = filterByOperation(outboundRows, filters, (row) => row.requestedAt, [
-    "no",
-    "client",
-    "warehouse",
-    "channel",
-    "recipient",
-    "status",
-  ]);
-  const picking = filterByOperation(pickingRows, filters, (row) => row.startedAt, [
-    "wave",
-    "client",
-    "warehouse",
-    "zone",
-    "status",
-  ]);
-
+function Dashboard() {
   return (
     <div className="grid gap-5">
       <div className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
-        <Metric label="입고 진행" value={receiving.length.toLocaleString()} sub={`검수/적치 대상 ${sum(receiving, "requested").toLocaleString()}개`} icon={PackageCheck} tone="green" />
-        <Metric label="가용 재고" value={sum(inventory, "available").toLocaleString()} sub={`할당 ${sum(inventory, "allocated").toLocaleString()} / 보류 ${sum(inventory, "hold").toLocaleString()}`} icon={Boxes} tone="blue" />
-        <Metric label="출고 지시" value={outbound.length.toLocaleString()} sub={`${outbound.filter((row) => row.status === "재고부족").length}건 재고 확인 필요`} icon={Truck} tone="amber" />
-        <Metric label="피킹 작업" value={sum(picking, "tasks").toLocaleString()} sub={`완료 ${sum(picking, "picked").toLocaleString()} / 전체 ${sum(picking, "tasks").toLocaleString()}`} icon={ClipboardList} tone="slate" />
+        <Metric label="입고 진행" value={receivingRows.length.toLocaleString()} sub={`검수/적치 대상 ${sum(receivingRows, "requested").toLocaleString()}개`} icon={PackageCheck} tone="green" />
+        <Metric label="가용 재고" value={sum(inventoryRows, "available").toLocaleString()} sub={`할당 ${sum(inventoryRows, "allocated").toLocaleString()} / 보류 ${sum(inventoryRows, "hold").toLocaleString()}`} icon={Boxes} tone="blue" />
+        <Metric label="출고 지시" value={outboundRows.length.toLocaleString()} sub={`${outboundRows.filter((row) => row.status === "재고부족").length}건 재고 확인 필요`} icon={Truck} tone="amber" />
+        <Metric label="피킹 작업" value={sum(pickingRows, "tasks").toLocaleString()} sub={`완료 ${sum(pickingRows, "picked").toLocaleString()} / 전체 ${sum(pickingRows, "tasks").toLocaleString()}`} icon={ClipboardList} tone="slate" />
       </div>
 
       <div className="grid grid-cols-[1.25fr_0.75fr] gap-5 max-xl:grid-cols-1">
         <SectionPanel title="운영 이슈 큐" action="조회">
           <div className="grid gap-2">
             {[
-              ["입고 검수 대기", `${receiving.filter((row) => row.status === "검수중").length}건`, "검수 수량 반영 후 적치 작업 생성"],
-              ["출고 할당 실패", `${outbound.filter((row) => row.status === "재고부족").length}건`, "가용 재고와 보류 재고 확인"],
-              ["DPS 웨이브 대기", `${picking.filter((row) => row.zone === "DPS" && row.status === "대기").length}건`, "DPS Agent 연결 후 작업 시작"],
-              ["보류 재고", `${inventory.filter((row) => row.hold > 0).length}건`, "파손/검수 이슈 처리 필요"],
+              ["입고 검수 대기", `${receivingRows.filter((row) => row.status === "검수중").length}건`, "검수 수량 반영 후 적치 작업 생성"],
+              ["출고 할당 실패", `${outboundRows.filter((row) => row.status === "재고부족").length}건`, "가용 재고와 보류 재고 확인"],
+              ["DPS 웨이브 대기", `${pickingRows.filter((row) => row.zone === "DPS" && row.status === "대기").length}건`, "DPS Agent 연결 후 작업 시작"],
+              ["보류 재고", `${inventoryRows.filter((row) => row.hold > 0).length}건`, "파손/검수 이슈 처리 필요"],
             ].map(([label, count, desc]) => (
               <div key={label} className="grid grid-cols-[1fr_auto] items-center border-b border-[#e0e6e8] py-3 last:border-b-0">
                 <div>
@@ -483,7 +467,7 @@ function Dashboard({ filters }: { filters: OperationFilters }) {
         <SectionPanel title="고객사별 처리 현황" action="SLA">
           <div className="grid gap-3">
             {clientOptions.slice(1).map((client) => {
-              const clientOutbound = outbound.filter((row) => row.client === client);
+              const clientOutbound = outboundRows.filter((row) => row.client === client);
               const completed = clientOutbound.filter((row) => row.status === "피킹완료").length;
               const rate = clientOutbound.length ? Math.round((completed / clientOutbound.length) * 100) : 0;
               return (
@@ -495,15 +479,20 @@ function Dashboard({ filters }: { filters: OperationFilters }) {
       </div>
 
       <div className="grid grid-cols-3 gap-5 max-xl:grid-cols-1">
-        <MiniList title="최근 입고 내역" rows={receiving.slice(0, 4).map((row) => [row.no, row.status])} />
-        <MiniList title="최근 출고 내역" rows={outbound.slice(0, 4).map((row) => [row.no, row.status])} />
-        <MiniList title="재고 주의" rows={inventory.filter((row) => row.status !== "정상").map((row) => [row.sku, row.status])} />
+        <MiniList title="최근 입고 내역" rows={receivingRows.slice(0, 4).map((row) => [row.no, row.status])} />
+        <MiniList title="최근 출고 내역" rows={outboundRows.slice(0, 4).map((row) => [row.no, row.status])} />
+        <MiniList title="재고 주의" rows={inventoryRows.filter((row) => row.status !== "정상").map((row) => [row.sku, row.status])} />
       </div>
     </div>
   );
 }
 
-function ReceivingView({ filters }: { filters: OperationFilters }) {
+function ReceivingView() {
+  const [filters, setFilters] = useState<OperationFilters>({
+    ...defaultFilters,
+    warehouse: "전체",
+    status: "전체",
+  });
   const rows = filterByOperation(receivingRows, filters, (row) => row.expectedDate, [
     "no",
     "client",
@@ -517,6 +506,13 @@ function ReceivingView({ filters }: { filters: OperationFilters }) {
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="입고 내역" actions={["입고 생성", "검수 반영", "엑셀"]} />
+      <CompactFilterBar
+        filters={filters}
+        onChange={setFilters}
+        statusOptions={["전체", "입고예정", "검수중", "적치중", "적치완료"]}
+        keywordPlaceholder="입고번호, SKU, 상품명, 공급처"
+        fields={["client", "warehouse", "status", "date", "keyword"]}
+      />
       <SectionPanel title="입고 지시 및 분할 적치" action="상세 조회">
         <DataTable
           columns={["입고번호", "고객사", "창고", "입고예정일", "상품", "공급처", "예정", "검수", "적치", "진행률", "상태"]}
@@ -539,7 +535,13 @@ function ReceivingView({ filters }: { filters: OperationFilters }) {
   );
 }
 
-function InventoryView({ filters }: { filters: OperationFilters }) {
+function InventoryView() {
+  const [filters, setFilters] = useState<OperationFilters>({
+    ...defaultFilters,
+    status: "전체",
+    fromDate: "",
+    toDate: "",
+  });
   const rows = filterByOperation(inventoryRows, filters, (row) => row.lastMovedAt, [
     "sku",
     "name",
@@ -553,6 +555,13 @@ function InventoryView({ filters }: { filters: OperationFilters }) {
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="재고 레코드" actions={["재고 이동", "보류 전환", "CSV"]} />
+      <CompactFilterBar
+        filters={filters}
+        onChange={setFilters}
+        statusOptions={["전체", "정상", "보류", "부족주의"]}
+        keywordPlaceholder="SKU, 상품명, 로케이션, LOT"
+        fields={["client", "warehouse", "status", "keyword"]}
+      />
       <div className="grid grid-cols-3 gap-4 max-lg:grid-cols-1">
         <Metric label="가용 수량" value={sum(rows, "available").toLocaleString()} sub="출고 할당 가능" icon={Boxes} tone="blue" />
         <Metric label="할당 수량" value={sum(rows, "allocated").toLocaleString()} sub="피킹 대기 포함" icon={ClipboardList} tone="slate" />
@@ -579,7 +588,8 @@ function InventoryView({ filters }: { filters: OperationFilters }) {
   );
 }
 
-function OutboundView({ filters }: { filters: OperationFilters }) {
+function OutboundView() {
+  const [filters, setFilters] = useState<OperationFilters>(defaultFilters);
   const rows = filterByOperation(outboundRows, filters, (row) => row.requestedAt, [
     "no",
     "client",
@@ -588,33 +598,54 @@ function OutboundView({ filters }: { filters: OperationFilters }) {
     "recipient",
     "status",
   ]);
+  const [selectedNo, setSelectedNo] = useState(rows[0]?.no ?? "");
+  const selectedOrder = rows.find((row) => row.no === selectedNo) ?? rows[0];
+  const invoiceRows = selectedOrder ? outboundInvoiceRows.filter((invoice) => invoice.outboundNo === selectedOrder.no) : [];
 
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="출고 지시" actions={["지시 등록", "일괄 할당", "엑셀"]} />
+      <CompactFilterBar
+        filters={filters}
+        onChange={setFilters}
+        statusOptions={["전체", "지시접수", "할당완료", "재고부족", "피킹완료"]}
+        keywordPlaceholder="출고번호, 수취인, 채널"
+        fields={["client", "status", "date", "keyword"]}
+      />
       <SectionPanel title="출고 지시 접수 및 처리 내역" action="필터 저장">
-        <DataTable
-          columns={["출고번호", "고객사", "창고", "수집 경로", "수취인", "요청일", "라인", "할당", "피킹", "진행률", "상태"]}
-          rows={rows.map((row) => [
-            row.no,
-            row.client,
-            row.warehouse,
-            row.channel,
-            row.recipient,
-            row.requestedAt,
-            row.lines.toLocaleString(),
-            row.allocated.toLocaleString(),
-            row.picked.toLocaleString(),
-            <ProgressBar key={`${row.no}-progress`} value={row.lines ? Math.round((row.picked / row.lines) * 100) : 0} />,
-            <StatusPill key={row.no} value={row.status} />,
-          ])}
-        />
+        <OutboundOrderTable rows={rows} selectedNo={selectedOrder?.no ?? ""} onSelect={setSelectedNo} />
       </SectionPanel>
+      {selectedOrder && (
+        <SectionPanel title={`${selectedOrder.no} 송장 상세`} action={`${invoiceRows.length}건`}>
+          <div className="mb-4 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+            <SummaryBox label="고객사" value={selectedOrder.client} />
+            <SummaryBox label="수취인" value={selectedOrder.recipient} />
+            <SummaryBox label="수집 경로" value={selectedOrder.channel} />
+            <SummaryBox label="진행 상태" value={selectedOrder.status} />
+          </div>
+          <DataTable
+            columns={["송장번호", "상품", "수량", "할당", "피킹", "택배사", "출력상태"]}
+            rows={invoiceRows.map((invoice) => [
+              invoice.invoiceNo,
+              <SkuCell key={invoice.invoiceNo} sku={invoice.sku} name={invoice.product} />,
+              invoice.quantity.toLocaleString(),
+              invoice.allocated.toLocaleString(),
+              invoice.picked.toLocaleString(),
+              invoice.carrier,
+              <StatusPill key={`${invoice.invoiceNo}-status`} value={invoice.printStatus} />,
+            ])}
+          />
+        </SectionPanel>
+      )}
     </div>
   );
 }
 
-function PickingView({ filters }: { filters: OperationFilters }) {
+function PickingView() {
+  const [filters, setFilters] = useState<OperationFilters>({
+    ...defaultFilters,
+    warehouse: "전체",
+  });
   const rows = filterByOperation(pickingRows, filters, (row) => row.startedAt, [
     "wave",
     "client",
@@ -626,6 +657,13 @@ function PickingView({ filters }: { filters: OperationFilters }) {
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="피킹 웨이브" actions={["웨이브 생성", "DPS 전송", "작업 배정"]} />
+      <CompactFilterBar
+        filters={filters}
+        onChange={setFilters}
+        statusOptions={["전체", "대기", "진행중", "완료"]}
+        keywordPlaceholder="웨이브, 존, 고객사"
+        fields={["client", "warehouse", "status", "date", "keyword"]}
+      />
       <SectionPanel title="출고 웨이브 및 피킹 작업" action="작업자 배정">
         <DataTable
           columns={["웨이브", "고객사", "창고", "존", "시작일", "주문", "작업", "완료", "진행률", "상태"]}
@@ -781,40 +819,57 @@ function AgentsView() {
   );
 }
 
-function OperationFilterBar({
+function CompactFilterBar({
   filters,
   onChange,
   statusOptions,
+  keywordPlaceholder,
+  fields,
 }: {
   filters: OperationFilters;
   onChange: (filters: OperationFilters) => void;
   statusOptions: string[];
+  keywordPlaceholder: string;
+  fields: Array<"client" | "warehouse" | "status" | "date" | "keyword">;
 }) {
   const update = (patch: Partial<OperationFilters>) => onChange({ ...filters, ...patch });
 
   return (
-    <section className="rounded-md border border-[#d7dee2] bg-white p-4">
-      <div className="mb-3 flex items-center justify-between gap-3 max-sm:flex-col max-sm:items-start">
-        <div className="flex items-center gap-2 text-sm font-semibold">
+    <section className="rounded-md border border-[#d7dee2] bg-white px-4 py-3">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 max-md:grid-cols-1">
+        <div className="flex h-10 items-center gap-2 text-sm font-semibold text-[#2f3a42]">
           <SlidersHorizontal size={17} />
-          운영 조회 조건
+          조회 조건
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
+          {fields.includes("client") && (
+            <SelectField label="고객사" value={filters.client} options={clientOptions} onChange={(client) => update({ client })} compact />
+          )}
+          {fields.includes("warehouse") && (
+            <SelectField label="창고" value={filters.warehouse} options={warehouseOptions} onChange={(warehouse) => update({ warehouse })} compact />
+          )}
+          {fields.includes("status") && (
+            <SelectField label="상태" value={filters.status} options={statusOptions} onChange={(status) => update({ status })} compact />
+          )}
+          {fields.includes("date") && (
+            <DateRangeFields
+              fromDate={filters.fromDate}
+              toDate={filters.toDate}
+              onChange={(patch) => update(patch)}
+            />
+          )}
+          {fields.includes("keyword") && (
+            <TextField label="검색" value={filters.keyword} placeholder={keywordPlaceholder} onChange={(keyword) => update({ keyword })} compact />
+          )}
         </div>
         <button
           type="button"
           onClick={() => onChange(defaultFilters)}
-          className="flex h-8 items-center gap-1 rounded-md border border-[#cbd5d9] px-2 text-xs text-[#4b5963] hover:bg-[#f4f7f7]"
+          className="flex h-9 items-center justify-center gap-1 rounded-md border border-[#cbd5d9] px-3 text-xs text-[#4b5963] hover:bg-[#f4f7f7]"
         >
           <X size={14} />
           초기화
         </button>
-      </div>
-      <div className="grid grid-cols-[1.1fr_0.9fr_0.9fr_0.9fr_0.9fr_1.4fr] gap-3 max-2xl:grid-cols-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-        <SelectField label="고객사" value={filters.client} options={clientOptions} onChange={(client) => update({ client })} />
-        <SelectField label="창고" value={filters.warehouse} options={warehouseOptions} onChange={(warehouse) => update({ warehouse })} />
-        <SelectField label="상태" value={filters.status} options={statusOptions} onChange={(status) => update({ status })} />
-        <DateField label="시작일" value={filters.fromDate} onChange={(fromDate) => update({ fromDate })} />
-        <DateField label="종료일" value={filters.toDate} onChange={(toDate) => update({ toDate })} />
-        <TextField label="통합 검색" value={filters.keyword} onChange={(keyword) => update({ keyword })} />
       </div>
     </section>
   );
@@ -845,6 +900,78 @@ function ResultToolbar({ count, label, actions }: { count: number; label: string
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function OutboundOrderTable({
+  rows,
+  selectedNo,
+  onSelect,
+}: {
+  rows: OutboundRow[];
+  selectedNo: string;
+  onSelect: (no: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-[#d7dee2] text-xs uppercase text-[#6b7780]">
+            {["출고번호", "고객사", "창고", "수집 경로", "수취인", "요청일", "라인", "할당", "피킹", "진행률", "상태"].map((column) => (
+              <th key={column} className="px-3 py-3 font-medium">
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const selected = row.no === selectedNo;
+            return (
+              <tr
+                key={row.no}
+                onClick={() => onSelect(row.no)}
+                className={`cursor-pointer border-b border-[#edf1f2] last:border-b-0 ${
+                  selected ? "bg-[#e6f0ee]" : "hover:bg-[#f8faf9]"
+                }`}
+              >
+                <td className="px-3 py-3 font-medium text-[#1b5e57]">{row.no}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.client}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.warehouse}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.channel}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.recipient}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.requestedAt}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.lines.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.allocated.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.picked.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">
+                  <ProgressBar value={row.lines ? Math.round((row.picked / row.lines) * 100) : 0} />
+                </td>
+                <td className="px-3 py-3 text-[#2f3a42]">
+                  <StatusPill value={row.status} />
+                </td>
+              </tr>
+            );
+          })}
+          {!rows.length && (
+            <tr>
+              <td className="px-3 py-10 text-center text-sm text-[#6b7780]" colSpan={11}>
+                조회 조건에 맞는 출고 지시가 없습니다.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SummaryBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[#d7dee2] bg-[#fbfcfb] p-3">
+      <p className="text-xs text-[#6b7780]">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-[#1f2933]">{value}</p>
     </div>
   );
 }
@@ -940,19 +1067,21 @@ function SelectField({
   value,
   options,
   onChange,
+  compact = false,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  compact?: boolean;
 }) {
   return (
     <label className="grid gap-1 text-xs font-medium text-[#6b7780]">
-      {label}
+      <span className={compact ? "sr-only" : undefined}>{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-md border border-[#cbd5d9] bg-white px-3 text-sm text-[#1f2933] outline-none focus:border-[#1b5e57]"
+        className={`${compact ? "h-9" : "h-10"} rounded-md border border-[#cbd5d9] bg-white px-3 text-sm text-[#1f2933] outline-none focus:border-[#1b5e57]`}
       >
         {options.map((option) => (
           <option key={option} value={option}>
@@ -964,35 +1093,64 @@ function SelectField({
   );
 }
 
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateRangeFields({
+  fromDate,
+  toDate,
+  onChange,
+}: {
+  fromDate: string;
+  toDate: string;
+  onChange: (patch: Pick<OperationFilters, "fromDate"> | Pick<OperationFilters, "toDate">) => void;
+}) {
+  return (
+    <div className="grid min-w-[260px] grid-cols-2 gap-2 max-sm:min-w-0">
+      <DateInput label="시작일" value={fromDate} onChange={(value) => onChange({ fromDate: value })} />
+      <DateInput label="종료일" value={toDate} onChange={(value) => onChange({ toDate: value })} />
+    </div>
+  );
+}
+
+function DateInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="grid gap-1 text-xs font-medium text-[#6b7780]">
-      {label}
+      <span className="sr-only">{label}</span>
       <span className="relative">
         <CalendarDays className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7780]" size={15} />
         <input
           type="date"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-10 w-full rounded-md border border-[#cbd5d9] bg-white pl-9 pr-3 text-sm text-[#1f2933] outline-none focus:border-[#1b5e57]"
+          className="h-9 w-full rounded-md border border-[#cbd5d9] bg-white pl-9 pr-3 text-sm text-[#1f2933] outline-none focus:border-[#1b5e57]"
         />
       </span>
     </label>
   );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextField({
+  label,
+  value,
+  placeholder,
+  onChange,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+  compact?: boolean;
+}) {
   return (
     <label className="grid gap-1 text-xs font-medium text-[#6b7780]">
-      {label}
+      <span className={compact ? "sr-only" : undefined}>{label}</span>
       <span className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7780]" size={15} />
         <input
           type="search"
           value={value}
-          placeholder="번호, SKU, 상품명, 수취인 검색"
+          placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className="h-10 w-full rounded-md border border-[#cbd5d9] bg-white pl-9 pr-3 text-sm text-[#1f2933] outline-none focus:border-[#1b5e57]"
+          className={`${compact ? "h-9" : "h-10"} w-full rounded-md border border-[#cbd5d9] bg-white pl-9 pr-3 text-sm text-[#1f2933] outline-none focus:border-[#1b5e57]`}
         />
       </span>
     </label>
@@ -1091,22 +1249,6 @@ function MiniList({ title, rows }: { title: string; rows: string[][] }) {
       </div>
     </SectionPanel>
   );
-}
-
-function statusOptionsFor(section: AdminSection): string[] {
-  if (section === "receiving") {
-    return ["전체", "입고예정", "검수중", "적치중", "적치완료"];
-  }
-  if (section === "inventory") {
-    return ["전체", "정상", "보류", "부족주의"];
-  }
-  if (section === "outbound") {
-    return ["전체", "지시접수", "할당완료", "재고부족", "피킹완료"];
-  }
-  if (section === "picking") {
-    return ["전체", "대기", "진행중", "완료"];
-  }
-  return ["전체", "입고예정", "검수중", "적치중", "적치완료", "정상", "보류", "부족주의", "지시접수", "할당완료", "재고부족", "피킹완료", "대기", "진행중", "완료"];
 }
 
 function filterByOperation<T extends { client: string; warehouse: string; status: string }>(
