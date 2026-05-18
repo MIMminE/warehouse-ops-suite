@@ -93,6 +93,17 @@ type InventoryRow = {
   status: string;
 };
 
+type LocationCell = {
+  code: string;
+  zone: string;
+  bay: string;
+  level: string;
+  capacity: number;
+  used: number;
+  status: "정상" | "주의" | "보류" | "빈 로케이션";
+  handlingType: "피킹" | "보관" | "검수" | "반품";
+};
+
 type OutboundRow = {
   no: string;
   client: string;
@@ -260,6 +271,21 @@ const inventoryRows: InventoryRow[] = [
     lastMovedAt: "2026-05-19",
     status: "부족주의",
   },
+];
+
+const locationCells: LocationCell[] = [
+  { code: "A-01-01", zone: "A", bay: "01", level: "01", capacity: 120, used: 92, status: "정상", handlingType: "피킹" },
+  { code: "A-01-02", zone: "A", bay: "01", level: "02", capacity: 120, used: 74, status: "정상", handlingType: "피킹" },
+  { code: "A-01-03", zone: "A", bay: "01", level: "03", capacity: 140, used: 116, status: "정상", handlingType: "피킹" },
+  { code: "A-02-01", zone: "A", bay: "02", level: "01", capacity: 100, used: 34, status: "빈 로케이션", handlingType: "보관" },
+  { code: "B-01-01", zone: "B", bay: "01", level: "01", capacity: 110, used: 86, status: "정상", handlingType: "보관" },
+  { code: "B-02-01", zone: "B", bay: "02", level: "01", capacity: 100, used: 94, status: "보류", handlingType: "피킹" },
+  { code: "B-02-02", zone: "B", bay: "02", level: "02", capacity: 100, used: 68, status: "정상", handlingType: "보관" },
+  { code: "C-03-01", zone: "C", bay: "03", level: "01", capacity: 160, used: 127, status: "정상", handlingType: "검수" },
+  { code: "C-04-05", zone: "C", bay: "04", level: "05", capacity: 180, used: 171, status: "주의", handlingType: "보관" },
+  { code: "D-01-01", zone: "D", bay: "01", level: "01", capacity: 90, used: 49, status: "정상", handlingType: "반품" },
+  { code: "D-01-02", zone: "D", bay: "01", level: "02", capacity: 90, used: 83, status: "주의", handlingType: "피킹" },
+  { code: "D-02-01", zone: "D", bay: "02", level: "01", capacity: 120, used: 0, status: "빈 로케이션", handlingType: "보관" },
 ];
 
 const outboundRows: OutboundRow[] = [
@@ -542,6 +568,7 @@ function InventoryView() {
     fromDate: "",
     toDate: "",
   });
+  const [selectedLocationCode, setSelectedLocationCode] = useState("A-01-03");
   const rows = filterByOperation(inventoryRows, filters, (row) => row.lastMovedAt, [
     "sku",
     "name",
@@ -551,6 +578,9 @@ function InventoryView() {
     "lot",
     "status",
   ]);
+  const selectedLocation =
+    locationCells.find((location) => location.code === selectedLocationCode) ?? locationCells[0];
+  const selectedLocationInventory = rows.filter((row) => row.location === selectedLocation.code);
 
   return (
     <div className="grid gap-5">
@@ -567,6 +597,12 @@ function InventoryView() {
         <Metric label="할당 수량" value={sum(rows, "allocated").toLocaleString()} sub="피킹 대기 포함" icon={ClipboardList} tone="slate" />
         <Metric label="보류 수량" value={sum(rows, "hold").toLocaleString()} sub="검수/파손/분실 이슈" icon={Filter} tone="amber" />
       </div>
+      <LocationOverview
+        locations={locationCells}
+        selectedLocation={selectedLocation}
+        selectedInventory={selectedLocationInventory}
+        onSelect={setSelectedLocationCode}
+      />
       <SectionPanel title="로케이션별 재고" action="상세 조회">
         <DataTable
           columns={["SKU", "고객사", "창고", "로케이션", "LOT", "가용", "할당", "보류", "최근 이동", "상태"]}
@@ -817,6 +853,147 @@ function AgentsView() {
       />
     </SectionPanel>
   );
+}
+
+function LocationOverview({
+  locations,
+  selectedLocation,
+  selectedInventory,
+  onSelect,
+}: {
+  locations: LocationCell[];
+  selectedLocation: LocationCell;
+  selectedInventory: InventoryRow[];
+  onSelect: (code: string) => void;
+}) {
+  const zones = Array.from(new Set(locations.map((location) => location.zone)));
+  const totalCapacity = sum(locations, "capacity");
+  const totalUsed = sum(locations, "used");
+  const usageRate = totalCapacity ? Math.round((totalUsed / totalCapacity) * 100) : 0;
+
+  return (
+    <section className="rounded-md border border-[#d7dee2] bg-white">
+      <div className="flex min-h-12 items-center justify-between border-b border-[#e0e6e8] px-4">
+        <div>
+          <h2 className="text-sm font-semibold">로케이션 맵</h2>
+          <p className="mt-0.5 text-xs text-[#6b7780]">존, 베이, 레벨 기준 보관 상태</p>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-[#6b7780] max-sm:hidden">
+          <LegendDot className="bg-[#1b5e57]" label="정상" />
+          <LegendDot className="bg-[#c98a14]" label="주의" />
+          <LegendDot className="bg-[#9b2c2c]" label="보류" />
+          <LegendDot className="bg-[#cbd5d9]" label="빈 로케이션" />
+        </div>
+      </div>
+      <div className="grid grid-cols-[1.25fr_0.75fr] gap-5 p-4 max-xl:grid-cols-1">
+        <div className="grid gap-4">
+          <div className="grid grid-cols-3 gap-3 max-md:grid-cols-1">
+            <SummaryBox label="전체 로케이션" value={`${locations.length.toLocaleString()}개`} />
+            <SummaryBox label="평균 점유율" value={`${usageRate}%`} />
+            <SummaryBox label="주의/보류" value={`${locations.filter((location) => location.status === "주의" || location.status === "보류").length}개`} />
+          </div>
+          <div className="grid grid-cols-4 gap-3 max-2xl:grid-cols-2 max-sm:grid-cols-1">
+            {zones.map((zone) => {
+              const zoneLocations = locations.filter((location) => location.zone === zone);
+              return (
+                <div key={zone} className="rounded-md border border-[#d7dee2] bg-[#fbfcfb] p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <strong className="text-sm">Zone {zone}</strong>
+                    <span className="text-xs text-[#6b7780]">{zoneLocations.length} cells</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {zoneLocations.map((location) => {
+                      const selected = location.code === selectedLocation.code;
+                      return (
+                        <button
+                          key={location.code}
+                          type="button"
+                          title={`${location.code} ${location.status}`}
+                          onClick={() => onSelect(location.code)}
+                          className={`aspect-square rounded-md border p-2 text-left transition ${
+                            selected
+                              ? "border-[#1b5e57] bg-[#e6f0ee] ring-2 ring-[#1b5e57]/20"
+                              : "border-[#d7dee2] bg-white hover:border-[#9fb5b1]"
+                          }`}
+                        >
+                          <span className={`mb-2 block h-2 rounded-full ${locationStatusColor(location.status)}`} />
+                          <span className="block text-xs font-semibold">{location.code}</span>
+                          <span className="mt-1 block text-[11px] text-[#6b7780]">{locationUsage(location)}%</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-[#d7dee2] bg-[#fbfcfb] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs text-[#6b7780]">선택 로케이션</p>
+              <h3 className="mt-1 text-xl font-semibold">{selectedLocation.code}</h3>
+            </div>
+            <StatusPill value={selectedLocation.status} />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <SummaryBox label="존/베이/레벨" value={`${selectedLocation.zone}-${selectedLocation.bay}-${selectedLocation.level}`} />
+            <SummaryBox label="작업 유형" value={selectedLocation.handlingType} />
+            <SummaryBox label="적재 수량" value={`${selectedLocation.used.toLocaleString()} / ${selectedLocation.capacity.toLocaleString()}`} />
+            <SummaryBox label="점유율" value={`${locationUsage(selectedLocation)}%`} />
+          </div>
+          <div className="mt-4">
+            <ProgressBar value={locationUsage(selectedLocation)} />
+          </div>
+          <div className="mt-5">
+            <p className="mb-2 text-sm font-semibold">보관 SKU</p>
+            <div className="grid gap-2">
+              {selectedInventory.map((row) => (
+                <div key={`${row.location}-${row.sku}`} className="rounded-md border border-[#d7dee2] bg-white p-3">
+                  <SkuCell sku={row.sku} name={row.name} />
+                  <p className="mt-2 text-xs text-[#6b7780]">
+                    가용 {row.available.toLocaleString()} / 할당 {row.allocated.toLocaleString()} / 보류 {row.hold.toLocaleString()}
+                  </p>
+                </div>
+              ))}
+              {!selectedInventory.length && (
+                <div className="rounded-md border border-dashed border-[#cbd5d9] bg-white p-5 text-center text-sm text-[#6b7780]">
+                  현재 보관 중인 SKU가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`h-2 w-2 rounded-full ${className}`} />
+      {label}
+    </span>
+  );
+}
+
+function locationUsage(location: LocationCell): number {
+  return location.capacity ? Math.round((location.used / location.capacity) * 100) : 0;
+}
+
+function locationStatusColor(status: LocationCell["status"]): string {
+  if (status === "보류") {
+    return "bg-[#9b2c2c]";
+  }
+  if (status === "주의") {
+    return "bg-[#c98a14]";
+  }
+  if (status === "빈 로케이션") {
+    return "bg-[#cbd5d9]";
+  }
+  return "bg-[#1b5e57]";
 }
 
 function CompactFilterBar({
