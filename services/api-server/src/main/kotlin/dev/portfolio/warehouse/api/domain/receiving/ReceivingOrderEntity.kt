@@ -1,5 +1,6 @@
 package dev.portfolio.warehouse.api.domain.receiving
 
+import dev.portfolio.warehouse.api.domain.client.ClientCompanyEntity
 import dev.portfolio.warehouse.api.domain.warehouse.WarehouseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -19,6 +20,10 @@ import java.time.LocalDateTime
 class ReceivingOrderEntity(
     @Column(nullable = false, unique = true, length = 50)
     var receivingNo: String,
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "client_company_id", nullable = false)
+    var clientCompany: ClientCompanyEntity,
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
@@ -47,4 +52,3 @@ class ReceivingOrderEntity(
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 }
-

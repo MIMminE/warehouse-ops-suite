@@ -1,5 +1,6 @@
 package dev.portfolio.warehouse.api.domain.inventory
 
+import dev.portfolio.warehouse.api.domain.client.ClientCompanyEntity
 import dev.portfolio.warehouse.api.domain.product.SkuEntity
 import dev.portfolio.warehouse.api.domain.warehouse.LocationEntity
 import dev.portfolio.warehouse.api.domain.warehouse.WarehouseEntity
@@ -17,6 +18,10 @@ import java.time.LocalDateTime
 @Entity
 @Table(name = "inventories")
 class InventoryEntity(
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "client_company_id", nullable = false)
+    var clientCompany: ClientCompanyEntity,
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
     var warehouse: WarehouseEntity,
@@ -45,4 +50,3 @@ class InventoryEntity(
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 }
-
