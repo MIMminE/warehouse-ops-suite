@@ -1,6 +1,7 @@
 package dev.portfolio.warehouse.api.domain.picking
 
 import dev.portfolio.warehouse.api.domain.outbound.OutboundWaveEntity
+import dev.portfolio.warehouse.api.domain.outboundorder.OutboundOrderLineEntity
 import dev.portfolio.warehouse.api.domain.product.SkuEntity
 import dev.portfolio.warehouse.api.domain.warehouse.LocationEntity
 import dev.portfolio.warehouse.api.domain.warehouse.WarehouseEntity
@@ -26,6 +27,10 @@ class PickingTaskEntity(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "outbound_wave_id", nullable = false)
     var outboundWave: OutboundWaveEntity,
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "outbound_order_line_id")
+    var outboundOrderLine: OutboundOrderLineEntity? = null,
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
@@ -62,4 +67,3 @@ class PickingTaskEntity(
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 }
-
