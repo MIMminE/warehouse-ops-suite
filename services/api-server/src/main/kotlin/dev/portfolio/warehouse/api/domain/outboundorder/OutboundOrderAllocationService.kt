@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 class OutboundOrderAllocationService(
     private val outboundOrderRepository: OutboundOrderRepository,
     private val outboundOrderLineRepository: OutboundOrderLineRepository,
+    private val outboundOrderLineAllocationRepository: OutboundOrderLineAllocationRepository,
     private val inventoryRepository: InventoryRepository,
 ) {
     @Transactional
@@ -45,6 +46,7 @@ class OutboundOrderAllocationService(
             }
 
             var quantityToAllocate = remainingQuantity
+            val allocations = mutableListOf<OutboundOrderLineAllocationEntity>()
             inventories.forEach { inventory ->
                 if (quantityToAllocate <= 0) {
                     return@forEach
@@ -52,9 +54,17 @@ class OutboundOrderAllocationService(
                 val allocated = minOf(inventory.availableQuantity, quantityToAllocate)
                 inventory.availableQuantity -= allocated
                 inventory.allocatedQuantity += allocated
+                allocations += OutboundOrderLineAllocationEntity(
+                    outboundOrderLine = line,
+                    inventory = inventory,
+                    location = inventory.location,
+                    sku = line.sku,
+                    allocatedQuantity = allocated,
+                )
                 quantityToAllocate -= allocated
             }
             line.allocatedQuantity += remainingQuantity
+            outboundOrderLineAllocationRepository.saveAll(allocations)
         }
 
         order.status = OutboundOrderStatus.ALLOCATED
@@ -65,4 +75,3 @@ class OutboundOrderAllocationService(
         )
     }
 }
-
