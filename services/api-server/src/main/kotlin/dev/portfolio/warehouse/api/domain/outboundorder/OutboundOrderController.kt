@@ -6,9 +6,13 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 import org.springframework.http.HttpStatus
+import org.springframework.format.annotation.DateTimeFormat
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
@@ -18,7 +22,32 @@ import java.time.LocalDateTime
 @RequestMapping("/api/outbound-orders")
 class OutboundOrderController(
     private val outboundOrderIntakePort: OutboundOrderIntakePort,
+    private val outboundOrderQueryService: OutboundOrderQueryService,
 ) {
+    @GetMapping
+    fun search(
+        @RequestParam(required = false) clientCompanyId: Long?,
+        @RequestParam(required = false) status: OutboundOrderStatus?,
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        @RequestParam(required = false)
+        requestedShipDateFrom: LocalDate?,
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        @RequestParam(required = false)
+        requestedShipDateTo: LocalDate?,
+    ): List<OutboundOrderResponse> =
+        outboundOrderQueryService.search(
+            clientCompanyId = clientCompanyId,
+            status = status,
+            requestedShipDateFrom = requestedShipDateFrom,
+            requestedShipDateTo = requestedShipDateTo,
+        )
+
+    @GetMapping("/{orderId}")
+    fun getDetail(
+        @PathVariable orderId: Long,
+    ): OutboundOrderDetailResponse =
+        outboundOrderQueryService.getDetail(orderId)
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
@@ -95,4 +124,3 @@ data class OutboundOrderLineRequest(
             orderedQuantity = orderedQuantity,
         )
 }
-

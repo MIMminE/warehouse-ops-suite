@@ -22,6 +22,23 @@ data class OutboundOrderResponse(
     val createdAt: LocalDateTime,
 )
 
+data class OutboundOrderDetailResponse(
+    val order: OutboundOrderResponse,
+    val lines: List<OutboundOrderLineResponse>,
+)
+
+data class OutboundOrderLineResponse(
+    val id: Long,
+    val lineNo: Int,
+    val skuId: Long,
+    val skuCode: String,
+    val skuName: String,
+    val orderedQuantity: Int,
+    val allocatedQuantity: Int,
+    val pickedQuantity: Int,
+    val packedQuantity: Int,
+)
+
 fun OutboundOrderEntity.toResponse(): OutboundOrderResponse =
     OutboundOrderResponse(
         id = requireNotNull(id),
@@ -40,5 +57,18 @@ fun OutboundOrderEntity.toResponse(): OutboundOrderResponse =
         requestedShipDate = requestedShipDate,
         orderedAt = orderedAt,
         createdAt = createdAt,
+    )
+
+fun OutboundOrderLineEntity.toResponse(): OutboundOrderLineResponse =
+    OutboundOrderLineResponse(
+        id = requireNotNull(id),
+        lineNo = lineNo,
+        skuId = requireNotNull(sku.id),
+        skuCode = sku.code,
+        skuName = sku.name,
+        orderedQuantity = orderedQuantity,
+        allocatedQuantity = allocatedQuantity,
+        pickedQuantity = pickedQuantity,
+        packedQuantity = packedQuantity,
     )
 
