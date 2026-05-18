@@ -23,6 +23,7 @@ import java.time.LocalDateTime
 class OutboundOrderController(
     private val outboundOrderIntakePort: OutboundOrderIntakePort,
     private val outboundOrderQueryService: OutboundOrderQueryService,
+    private val outboundOrderAllocationService: OutboundOrderAllocationService,
 ) {
     @GetMapping
     fun search(
@@ -47,6 +48,12 @@ class OutboundOrderController(
         @PathVariable orderId: Long,
     ): OutboundOrderDetailResponse =
         outboundOrderQueryService.getDetail(orderId)
+
+    @PostMapping("/{orderId}/allocate")
+    fun allocate(
+        @PathVariable orderId: Long,
+    ): OutboundOrderDetailResponse =
+        outboundOrderAllocationService.allocate(orderId)
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
