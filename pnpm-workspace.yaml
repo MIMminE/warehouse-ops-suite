@@ -1,0 +1,5 @@
+packages:
+  - "apps/admin-web"
+  - "services/pdf-renderer"
+  - "packages/shared-contracts"
+
