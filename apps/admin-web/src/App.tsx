@@ -77,6 +77,31 @@ type ReceivingRow = {
   received: number;
   putaway: number;
   status: string;
+  worker: string;
+  device: string;
+  lastScannedAt: string;
+};
+
+type ReceivingSkuDetail = {
+  receivingNo: string;
+  sku: string;
+  product: string;
+  requested: number;
+  inspected: number;
+  putaway: number;
+  damaged: number;
+  shortage: number;
+  targetLocations: string[];
+};
+
+type ReceivingScanEvent = {
+  receivingNo: string;
+  time: string;
+  worker: string;
+  device: string;
+  event: string;
+  barcode: string;
+  result: string;
 };
 
 type InventoryRow = {
@@ -176,6 +201,9 @@ const receivingRows: ReceivingRow[] = [
     received: 96,
     putaway: 72,
     status: "검수중",
+    worker: "한지훈",
+    device: "PDA-01",
+    lastScannedAt: "10:42",
   },
   {
     no: "RCV-20260518-002",
@@ -189,6 +217,9 @@ const receivingRows: ReceivingRow[] = [
     received: 80,
     putaway: 80,
     status: "적치완료",
+    worker: "오세린",
+    device: "PDA-03",
+    lastScannedAt: "11:08",
   },
   {
     no: "RCV-20260518-003",
@@ -202,6 +233,9 @@ const receivingRows: ReceivingRow[] = [
     received: 210,
     putaway: 120,
     status: "적치중",
+    worker: "김도현",
+    device: "PDA-02",
+    lastScannedAt: "13:24",
   },
   {
     no: "RCV-20260519-004",
@@ -215,7 +249,27 @@ const receivingRows: ReceivingRow[] = [
     received: 0,
     putaway: 0,
     status: "입고예정",
+    worker: "-",
+    device: "-",
+    lastScannedAt: "-",
   },
+];
+
+const receivingSkuDetails: ReceivingSkuDetail[] = [
+  { receivingNo: "RCV-20260518-001", sku: "SKU-4012", product: "Basic Tee / Black", requested: 120, inspected: 96, putaway: 72, damaged: 2, shortage: 24, targetLocations: ["A-01-03", "A-01-02"] },
+  { receivingNo: "RCV-20260518-002", sku: "SKU-8801", product: "Daily Cap / Navy", requested: 80, inspected: 80, putaway: 80, damaged: 0, shortage: 0, targetLocations: ["B-02-01"] },
+  { receivingNo: "RCV-20260518-003", sku: "SKU-1024", product: "Slim Bottle / Clear", requested: 240, inspected: 210, putaway: 120, damaged: 4, shortage: 30, targetLocations: ["C-04-05", "C-03-01"] },
+  { receivingNo: "RCV-20260519-004", sku: "SKU-7780", product: "Pouch Set / Gray", requested: 160, inspected: 0, putaway: 0, damaged: 0, shortage: 0, targetLocations: ["D-01-02"] },
+];
+
+const receivingScanEvents: ReceivingScanEvent[] = [
+  { receivingNo: "RCV-20260518-001", time: "10:12", worker: "한지훈", device: "PDA-01", event: "입고번호 스캔", barcode: "RCV-20260518-001", result: "성공" },
+  { receivingNo: "RCV-20260518-001", time: "10:19", worker: "한지훈", device: "PDA-01", event: "상품 검수", barcode: "SKU-4012", result: "96개 검수" },
+  { receivingNo: "RCV-20260518-001", time: "10:31", worker: "한지훈", device: "PDA-01", event: "로케이션 스캔", barcode: "A-01-03", result: "적치 72개" },
+  { receivingNo: "RCV-20260518-002", time: "11:02", worker: "오세린", device: "PDA-03", event: "상품 검수", barcode: "SKU-8801", result: "80개 검수" },
+  { receivingNo: "RCV-20260518-002", time: "11:08", worker: "오세린", device: "PDA-03", event: "로케이션 스캔", barcode: "B-02-01", result: "적치 완료" },
+  { receivingNo: "RCV-20260518-003", time: "13:10", worker: "김도현", device: "PDA-02", event: "상품 검수", barcode: "SKU-1024", result: "파손 4개" },
+  { receivingNo: "RCV-20260518-003", time: "13:24", worker: "김도현", device: "PDA-02", event: "로케이션 스캔", barcode: "C-04-05", result: "적치 120개" },
 ];
 
 const inventoryRows: InventoryRow[] = [
@@ -519,6 +573,7 @@ function ReceivingView() {
     warehouse: "전체",
     status: "전체",
   });
+  const [selectedNo, setSelectedNo] = useState(receivingRows[0]?.no ?? "");
   const rows = filterByOperation(receivingRows, filters, (row) => row.expectedDate, [
     "no",
     "client",
@@ -527,11 +582,20 @@ function ReceivingView() {
     "product",
     "supplier",
     "status",
+    "worker",
+    "device",
   ]);
+  const selectedReceiving = rows.find((row) => row.no === selectedNo) ?? rows[0];
+  const selectedSkuDetails = selectedReceiving
+    ? receivingSkuDetails.filter((detail) => detail.receivingNo === selectedReceiving.no)
+    : [];
+  const selectedScanEvents = selectedReceiving
+    ? receivingScanEvents.filter((event) => event.receivingNo === selectedReceiving.no)
+    : [];
 
   return (
     <div className="grid gap-5">
-      <ResultToolbar count={rows.length} label="입고 내역" actions={["입고 생성", "검수 반영", "엑셀"]} />
+      <ResultToolbar count={rows.length} label="PDA 입고 작업" actions={["입고 지시 등록", "PDA 현황", "엑셀"]} />
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}
@@ -539,24 +603,22 @@ function ReceivingView() {
         keywordPlaceholder="입고번호, SKU, 상품명, 공급처"
         fields={["client", "warehouse", "status", "date", "keyword"]}
       />
-      <SectionPanel title="입고 지시 및 분할 적치" action="상세 조회">
-        <DataTable
-          columns={["입고번호", "고객사", "창고", "입고예정일", "상품", "공급처", "예정", "검수", "적치", "진행률", "상태"]}
-          rows={rows.map((row) => [
-            row.no,
-            row.client,
-            row.warehouse,
-            row.expectedDate,
-            <SkuCell key={`${row.no}-sku`} sku={row.sku} name={row.product} />,
-            row.supplier,
-            row.requested.toLocaleString(),
-            row.received.toLocaleString(),
-            row.putaway.toLocaleString(),
-            <ProgressBar key={`${row.no}-progress`} value={row.requested ? Math.round((row.putaway / row.requested) * 100) : 0} />,
-            <StatusPill key={row.no} value={row.status} />,
-          ])}
-        />
+      <div className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
+        <Metric label="입고 예정" value={sum(rows, "requested").toLocaleString()} sub="PDA 검수 대상" icon={PackageCheck} tone="green" />
+        <Metric label="검수 완료" value={sum(rows, "received").toLocaleString()} sub="상품 바코드 스캔 기준" icon={ClipboardList} tone="blue" />
+        <Metric label="적치 완료" value={sum(rows, "putaway").toLocaleString()} sub="로케이션 스캔 완료" icon={Warehouse} tone="slate" />
+        <Metric label="미적치" value={(sum(rows, "received") - sum(rows, "putaway")).toLocaleString()} sub="현장 작업 대기" icon={Filter} tone="amber" />
+      </div>
+      <SectionPanel title="PDA 입고/적치 진행 현황" action="작업 상세">
+        <ReceivingWorkTable rows={rows} selectedNo={selectedReceiving?.no ?? ""} onSelect={setSelectedNo} />
       </SectionPanel>
+      {selectedReceiving && (
+        <ReceivingWorkDetail
+          receiving={selectedReceiving}
+          skuDetails={selectedSkuDetails}
+          scanEvents={selectedScanEvents}
+        />
+      )}
     </div>
   );
 }
@@ -1140,6 +1202,135 @@ function OutboundOrderTable({
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function ReceivingWorkTable({
+  rows,
+  selectedNo,
+  onSelect,
+}: {
+  rows: ReceivingRow[];
+  selectedNo: string;
+  onSelect: (no: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-[#d7dee2] text-xs uppercase text-[#6b7780]">
+            {["입고번호", "고객사", "창고", "입고예정일", "작업자", "PDA", "예정", "검수", "적치", "미적치", "마지막 스캔", "상태"].map((column) => (
+              <th key={column} className="px-3 py-3 font-medium">
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const selected = row.no === selectedNo;
+            const notPutaway = Math.max(0, row.received - row.putaway);
+            return (
+              <tr
+                key={row.no}
+                onClick={() => onSelect(row.no)}
+                className={`cursor-pointer border-b border-[#edf1f2] last:border-b-0 ${
+                  selected ? "bg-[#e6f0ee]" : "hover:bg-[#f8faf9]"
+                }`}
+              >
+                <td className="px-3 py-3 font-medium text-[#1b5e57]">{row.no}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.client}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.warehouse}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.expectedDate}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.worker}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.device}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.requested.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.received.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.putaway.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{notPutaway.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.lastScannedAt}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">
+                  <StatusPill value={row.status} />
+                </td>
+              </tr>
+            );
+          })}
+          {!rows.length && (
+            <tr>
+              <td className="px-3 py-10 text-center text-sm text-[#6b7780]" colSpan={12}>
+                조회 조건에 맞는 PDA 입고 작업이 없습니다.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ReceivingWorkDetail({
+  receiving,
+  skuDetails,
+  scanEvents,
+}: {
+  receiving: ReceivingRow;
+  skuDetails: ReceivingSkuDetail[];
+  scanEvents: ReceivingScanEvent[];
+}) {
+  const inspected = sum(skuDetails, "inspected");
+  const putaway = sum(skuDetails, "putaway");
+
+  return (
+    <div className="grid grid-cols-[1fr_0.75fr] gap-5 max-xl:grid-cols-1">
+      <SectionPanel title={`${receiving.no} SKU 검수/적치 상세`} action={`${skuDetails.length}개 SKU`}>
+        <div className="mb-4 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+          <SummaryBox label="담당 작업자" value={`${receiving.worker} / ${receiving.device}`} />
+          <SummaryBox label="공급처" value={receiving.supplier} />
+          <SummaryBox label="검수 진행" value={`${inspected.toLocaleString()} / ${receiving.requested.toLocaleString()}`} />
+          <SummaryBox label="적치 진행" value={`${putaway.toLocaleString()} / ${inspected.toLocaleString()}`} />
+        </div>
+        <DataTable
+          columns={["SKU", "예정", "검수", "적치", "파손", "부족", "적치 로케이션", "진행률"]}
+          rows={skuDetails.map((detail) => [
+            <SkuCell key={detail.sku} sku={detail.sku} name={detail.product} />,
+            detail.requested.toLocaleString(),
+            detail.inspected.toLocaleString(),
+            detail.putaway.toLocaleString(),
+            detail.damaged.toLocaleString(),
+            detail.shortage.toLocaleString(),
+            detail.targetLocations.join(", "),
+            <ProgressBar key={`${detail.sku}-putaway`} value={detail.inspected ? Math.round((detail.putaway / detail.inspected) * 100) : 0} />,
+          ])}
+        />
+      </SectionPanel>
+
+      <SectionPanel title="PDA 스캔 이벤트" action={`${scanEvents.length}건`}>
+        <div className="grid gap-2">
+          {scanEvents.map((event) => (
+            <div key={`${event.time}-${event.barcode}`} className="rounded-md border border-[#d7dee2] bg-[#fbfcfb] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{event.event}</p>
+                  <p className="mt-1 text-xs text-[#6b7780]">
+                    {event.worker} / {event.device}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-[#4b5963]">{event.time}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3 text-xs">
+                <span className="truncate rounded-md bg-white px-2 py-1 text-[#4b5963]">{event.barcode}</span>
+                <StatusPill value={event.result} />
+              </div>
+            </div>
+          ))}
+          {!scanEvents.length && (
+            <div className="rounded-md border border-dashed border-[#cbd5d9] p-6 text-center text-sm text-[#6b7780]">
+              아직 PDA 스캔 이벤트가 없습니다.
+            </div>
+          )}
+        </div>
+      </SectionPanel>
     </div>
   );
 }
