@@ -72,6 +72,7 @@ class OutboundWaveService(
                 taskNo = "${request.waveNo}-${index + 1}",
                 outboundWave = wave,
                 outboundOrderLine = line,
+                outboundOrderLineAllocation = allocation,
                 warehouse = warehouse,
                 sourceLocation = allocation.location,
                 sku = allocation.sku,
@@ -83,4 +84,3 @@ class OutboundWaveService(
         return wave.toResponse(tasks)
     }
 }
-

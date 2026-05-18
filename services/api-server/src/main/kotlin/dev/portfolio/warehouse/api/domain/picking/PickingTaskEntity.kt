@@ -1,6 +1,7 @@
 package dev.portfolio.warehouse.api.domain.picking
 
 import dev.portfolio.warehouse.api.domain.outbound.OutboundWaveEntity
+import dev.portfolio.warehouse.api.domain.outboundorder.OutboundOrderLineAllocationEntity
 import dev.portfolio.warehouse.api.domain.outboundorder.OutboundOrderLineEntity
 import dev.portfolio.warehouse.api.domain.product.SkuEntity
 import dev.portfolio.warehouse.api.domain.warehouse.LocationEntity
@@ -31,6 +32,10 @@ class PickingTaskEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "outbound_order_line_id")
     var outboundOrderLine: OutboundOrderLineEntity? = null,
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "outbound_order_line_allocation_id")
+    var outboundOrderLineAllocation: OutboundOrderLineAllocationEntity? = null,
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "warehouse_id", nullable = false)
