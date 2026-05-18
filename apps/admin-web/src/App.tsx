@@ -559,9 +559,30 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-3 gap-5 max-xl:grid-cols-1">
-        <MiniList title="최근 입고 내역" rows={receivingRows.slice(0, 4).map((row) => [row.no, row.status])} />
-        <MiniList title="최근 출고 내역" rows={outboundRows.slice(0, 4).map((row) => [row.no, row.status])} />
-        <MiniList title="재고 주의" rows={inventoryRows.filter((row) => row.status !== "정상").map((row) => [row.sku, row.status])} />
+        <MiniList
+          title="최근 입고 내역"
+          rows={receivingRows.slice(0, 4).map((row) => ({
+            label: row.no,
+            description: `${row.client} / ${row.warehouse} / ${row.worker}`,
+            status: row.status,
+          }))}
+        />
+        <MiniList
+          title="최근 출고 내역"
+          rows={outboundRows.slice(0, 4).map((row) => ({
+            label: row.no,
+            description: `${row.client} / ${row.recipient} / ${row.channel}`,
+            status: row.status,
+          }))}
+        />
+        <MiniList
+          title="재고 주의"
+          rows={inventoryRows.filter((row) => row.status !== "정상").map((row) => ({
+            label: row.sku,
+            description: `${row.client} / ${row.location} / 보류 ${row.hold.toLocaleString()}`,
+            status: row.status,
+          }))}
+        />
       </div>
     </div>
   );
@@ -1603,14 +1624,23 @@ function ProgressRow({ label, value, progress }: { label: string; value: string;
   );
 }
 
-function MiniList({ title, rows }: { title: string; rows: string[][] }) {
+function MiniList({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ label: string; description: string; status: string }>;
+}) {
   return (
     <SectionPanel title={title} action={`${rows.length}건`}>
       <div className="grid gap-2">
-        {rows.map(([label, status]) => (
-          <div key={label} className="flex items-center justify-between gap-3 border-b border-[#edf1f2] py-2 last:border-b-0">
-            <span className="truncate text-sm font-medium">{label}</span>
-            <StatusPill value={status} />
+        {rows.map((row) => (
+          <div key={row.label} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[#edf1f2] py-2 last:border-b-0">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{row.label}</p>
+              <p className="mt-0.5 truncate text-xs text-[#6b7780]">{row.description}</p>
+            </div>
+            <StatusPill value={row.status} />
           </div>
         ))}
         {!rows.length && <p className="py-6 text-center text-sm text-[#6b7780]">표시할 항목이 없습니다.</p>}
