@@ -465,11 +465,15 @@ const waveInvoiceRows: WaveInvoiceRow[] = [
   { wave: "WAVE-0518-PM-01", invoiceNo: "INV-260519-0007", outboundNo: "OUT-20260519-0804", client: "A 고객사", recipient: "최도윤", sku: "SKU-1024", product: "Slim Bottle / Clear", location: "C-04-05", quantity: 2, picked: 0, worker: "DPS", device: "DPS-AGENT", status: "대기" },
 ];
 
-const agentRows = [
+const systemServiceRows = [
   { name: "API Server", endpoint: "http://localhost:8080", status: "설계 완료", note: "출고/입고/피킹 API" },
+  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "예정", note: "송장/Picking List 렌더링" },
+];
+
+const localAgentRows = [
   { name: "DPS Protocol Agent", endpoint: "ws://localhost:4030/ws/dps", status: "연결 가능", note: "피킹 배치 시뮬레이터" },
   { name: "Print Agent", endpoint: "http://localhost:4040", status: "예정", note: "송장 출력 큐" },
-  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "예정", note: "송장/Picking List 렌더링" },
+  { name: "PDA Sync Client", endpoint: "Android local storage", status: "예정", note: "오프라인 작업 재전송 큐" },
 ];
 
 export function App() {
@@ -966,17 +970,30 @@ function DpsMonitor() {
 
 function AgentsView() {
   return (
-    <SectionPanel title="실행 단위 프로그램" action="6개">
-      <DataTable
-        columns={["프로그램", "엔드포인트", "상태", "역할"]}
-        rows={agentRows.map((row) => [
-          row.name,
-          row.endpoint,
-          <StatusPill key={row.name} value={row.status} />,
-          row.note,
-        ])}
-      />
-    </SectionPanel>
+    <div className="grid gap-5">
+      <SectionPanel title="현장 로컬 에이전트" action={`${localAgentRows.length}개`}>
+        <DataTable
+          columns={["프로그램", "로컬 엔드포인트", "상태", "역할"]}
+          rows={localAgentRows.map((row) => [
+            row.name,
+            row.endpoint,
+            <StatusPill key={row.name} value={row.status} />,
+            row.note,
+          ])}
+        />
+      </SectionPanel>
+      <SectionPanel title="중앙 서비스 연결" action={`${systemServiceRows.length}개`}>
+        <DataTable
+          columns={["서비스", "엔드포인트", "상태", "역할"]}
+          rows={systemServiceRows.map((row) => [
+            row.name,
+            row.endpoint,
+            <StatusPill key={row.name} value={row.status} />,
+            row.note,
+          ])}
+        />
+      </SectionPanel>
+    </div>
   );
 }
 
