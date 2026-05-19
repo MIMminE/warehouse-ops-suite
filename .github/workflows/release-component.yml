@@ -1,0 +1,128 @@
+name: Release Component
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to package
+        required: true
+        type: choice
+        options:
+          - admin-web
+          - api-server
+          - print-agent
+          - dps-protocol-agent
+          - pdf-renderer
+          - pda-app
+      version:
+        description: Release version, for example 0.3.0
+        required: true
+        type: string
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        if: ${{ inputs.component == 'admin-web' || inputs.component == 'pdf-renderer' }}
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        if: ${{ inputs.component == 'admin-web' || inputs.component == 'pdf-renderer' }}
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        if: ${{ inputs.component == 'api-server' || inputs.component == 'print-agent' || inputs.component == 'dps-protocol-agent' }}
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: ${{ inputs.component == 'api-server' || inputs.component == 'print-agent' || inputs.component == 'dps-protocol-agent' }}
+        with:
+          gradle-version: 9.3.0
+
+      - uses: subosito/flutter-action@v2
+        if: ${{ inputs.component == 'pda-app' }}
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install pnpm dependencies
+        if: ${{ inputs.component == 'admin-web' || inputs.component == 'pdf-renderer' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Build admin web
+        if: ${{ inputs.component == 'admin-web' }}
+        run: pnpm --filter @warehouse/admin-web build
+
+      - name: Build pdf renderer
+        if: ${{ inputs.component == 'pdf-renderer' }}
+        run: pnpm --filter @warehouse/pdf-renderer build
+
+      - name: Build api server
+        if: ${{ inputs.component == 'api-server' }}
+        run: gradle --no-daemon :services:api-server:bootJar
+
+      - name: Build print agent
+        if: ${{ inputs.component == 'print-agent' }}
+        run: gradle --no-daemon :apps:print-agent:jar
+
+      - name: Build dps protocol agent
+        if: ${{ inputs.component == 'dps-protocol-agent' }}
+        run: gradle --no-daemon :apps:dps-protocol-agent:jar
+
+      - name: Build pda app
+        if: ${{ inputs.component == 'pda-app' }}
+        working-directory: apps/pda-app
+        run: |
+          flutter pub get
+          flutter build apk --debug
+
+      - name: Upload admin web artifact
+        if: ${{ inputs.component == 'admin-web' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-web-${{ inputs.version }}
+          path: apps/admin-web/dist
+
+      - name: Upload pdf renderer artifact
+        if: ${{ inputs.component == 'pdf-renderer' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-renderer-${{ inputs.version }}
+          path: services/pdf-renderer/dist
+
+      - name: Upload api server artifact
+        if: ${{ inputs.component == 'api-server' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-server-${{ inputs.version }}
+          path: services/api-server/build/libs/*.jar
+
+      - name: Upload print agent artifact
+        if: ${{ inputs.component == 'print-agent' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: print-agent-${{ inputs.version }}
+          path: apps/print-agent/build/libs/*.jar
+
+      - name: Upload dps protocol agent artifact
+        if: ${{ inputs.component == 'dps-protocol-agent' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dps-protocol-agent-${{ inputs.version }}
+          path: apps/dps-protocol-agent/build/libs/*.jar
+
+      - name: Upload pda app artifact
+        if: ${{ inputs.component == 'pda-app' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pda-app-${{ inputs.version }}
+          path: apps/pda-app/build/app/outputs/flutter-apk/*.apk

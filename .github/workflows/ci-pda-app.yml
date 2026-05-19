@@ -1,0 +1,32 @@
+name: CI PDA App
+
+on:
+  pull_request:
+    paths:
+      - "apps/pda-app/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/pda-app/**"
+
+jobs:
+  pda-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - working-directory: apps/pda-app
+        run: flutter pub get
+
+      - working-directory: apps/pda-app
+        run: flutter analyze
+
+      - working-directory: apps/pda-app
+        run: flutter test
+

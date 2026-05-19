@@ -1,0 +1,37 @@
+name: CI Local Agents
+
+on:
+  pull_request:
+    paths:
+      - "apps/print-agent/**"
+      - "apps/dps-protocol-agent/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/print-agent/**"
+      - "apps/dps-protocol-agent/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+
+jobs:
+  local-agents:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.3.0
+
+      - run: gradle --no-daemon :apps:print-agent:test :apps:dps-protocol-agent:test

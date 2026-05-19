@@ -1,0 +1,35 @@
+name: CI API Server
+
+on:
+  pull_request:
+    paths:
+      - "services/api-server/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/api-server/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+
+jobs:
+  api-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.3.0
+
+      - run: gradle --no-daemon :services:api-server:test
