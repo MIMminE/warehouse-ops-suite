@@ -6,4 +6,6 @@ interface PutawayTaskRepository : JpaRepository<PutawayTaskEntity, Long> {
     fun existsByTaskNo(taskNo: String): Boolean
 
     fun findByReceivingOrderLineId(receivingOrderLineId: Long): List<PutawayTaskEntity>
+
+    fun findByReceivingOrderLineIdIn(receivingOrderLineIds: Collection<Long>): List<PutawayTaskEntity>
 }

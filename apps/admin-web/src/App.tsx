@@ -22,7 +22,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { type ApiOutboundOrderStatus, warehouseApi } from "./api";
+import { type ApiOutboundOrderStatus, type ApiReceivingOrderStatus, warehouseApi } from "./api";
 
 type AdminSection =
   | "dashboard"
@@ -211,6 +211,10 @@ const clientIdByName: Record<string, number> = {
   "B 고객사": 2,
   "C 고객사": 3,
 };
+const warehouseIdByName: Record<string, number> = {
+  "수도권 1센터": 1,
+  "부산 2센터": 2,
+};
 const outboundStatusToApi: Partial<Record<string, ApiOutboundOrderStatus>> = {
   지시접수: "RECEIVED",
   할당완료: "ALLOCATED",
@@ -235,6 +239,21 @@ const intakeSourceLabel = {
   EDI_FILE: "EDI",
   MANUAL: "수기",
 } as const;
+const receivingStatusToApi: Partial<Record<string, ApiReceivingOrderStatus>> = {
+  입고예정: "REQUESTED",
+  검수중: "RECEIVING",
+  적치중: "PUTAWAY",
+  적치완료: "COMPLETED",
+  취소: "CANCELED",
+};
+const receivingStatusLabel: Record<ApiReceivingOrderStatus, string> = {
+  DRAFT: "초안",
+  REQUESTED: "입고예정",
+  RECEIVING: "검수중",
+  PUTAWAY: "적치중",
+  COMPLETED: "적치완료",
+  CANCELED: "취소",
+};
 
 const receivingRows: ReceivingRow[] = [
   {
@@ -656,8 +675,53 @@ function ReceivingView() {
     warehouse: "전체",
     status: "전체",
   });
-  const [selectedNo, setSelectedNo] = useState(receivingRows[0]?.no ?? "");
-  const rows = filterByOperation(receivingRows, filters, (row) => row.expectedDate, [
+  const receivingQueryParams = useMemo(
+    () => ({
+      clientCompanyId: clientIdByName[filters.client],
+      warehouseId: warehouseIdByName[filters.warehouse],
+      status: receivingStatusToApi[filters.status],
+      createdFrom: filters.fromDate,
+      createdTo: filters.toDate,
+    }),
+    [filters.client, filters.fromDate, filters.status, filters.toDate, filters.warehouse],
+  );
+  const receivingOrdersQuery = useQuery({
+    queryKey: ["receiving-orders", receivingQueryParams],
+    queryFn: () => warehouseApi.searchReceivingOrders(receivingQueryParams),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const apiRows = useMemo<ReceivingRow[] | null>(() => {
+    if (!receivingOrdersQuery.data) {
+      return null;
+    }
+
+    return receivingOrdersQuery.data.map((order) => {
+      const firstLine = order.lines[0];
+      return {
+        no: order.receivingNo,
+        client: order.clientCompanyName,
+        warehouse: order.warehouseName,
+        sku: firstLine?.skuCode ?? "-",
+        product: firstLine?.skuName ?? "-",
+        supplier: order.supplierName ?? "-",
+        expectedDate: order.createdAt,
+        requested: order.requestedQuantity,
+        received: order.receivedQuantity,
+        putaway: order.putawayQuantity,
+        status: receivingStatusLabel[order.status],
+        worker: order.requestedBy,
+        device: "PDA",
+        lastScannedAt: order.createdAt,
+      };
+    });
+  }, [receivingOrdersQuery.data]);
+  const sourceRows = receivingOrdersQuery.isError || !apiRows ? receivingRows : apiRows;
+  const effectiveFilters = apiRows && !receivingOrdersQuery.isError
+    ? { ...filters, client: "전체", warehouse: "전체", status: "전체" }
+    : filters;
+  const [selectedNo, setSelectedNo] = useState(sourceRows[0]?.no ?? "");
+  const rows = filterByOperation(sourceRows, effectiveFilters, (row) => row.expectedDate, [
     "no",
     "client",
     "warehouse",
@@ -669,16 +733,40 @@ function ReceivingView() {
     "device",
   ]);
   const selectedReceiving = rows.find((row) => row.no === selectedNo) ?? rows[0];
-  const selectedSkuDetails = selectedReceiving
-    ? receivingSkuDetails.filter((detail) => detail.receivingNo === selectedReceiving.no)
-    : [];
+  const selectedApiReceiving = selectedReceiving
+    ? receivingOrdersQuery.data?.find((order) => order.receivingNo === selectedReceiving.no)
+    : undefined;
+  const selectedSkuDetails = selectedApiReceiving
+    ? selectedApiReceiving.lines.map((line) => ({
+        receivingNo: selectedApiReceiving.receivingNo,
+        sku: line.skuCode,
+        product: line.skuName,
+        requested: line.requestedQuantity,
+        inspected: line.receivedQuantity,
+        putaway: line.putawayQuantity,
+        damaged: 0,
+        shortage: Math.max(line.requestedQuantity - line.receivedQuantity, 0),
+        targetLocations: ["입고 API"],
+      }))
+    : selectedReceiving
+      ? receivingSkuDetails.filter((detail) => detail.receivingNo === selectedReceiving.no)
+      : [];
   const selectedScanEvents = selectedReceiving
     ? receivingScanEvents.filter((event) => event.receivingNo === selectedReceiving.no)
     : [];
+  const dataModeLabel = receivingOrdersQuery.isError
+    ? "API 연결 실패 / 데모 데이터 표시"
+    : receivingOrdersQuery.isFetching
+      ? "API 동기화 중"
+      : "API 데이터";
 
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="PDA 입고 작업" actions={["입고 지시 등록", "PDA 현황", "엑셀"]} />
+      <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
+        <span className="font-medium text-[#2f3a42]">데이터 소스</span>
+        <span className={receivingOrdersQuery.isError ? "text-[#b42318]" : "text-[#1b5e57]"}>{dataModeLabel}</span>
+      </div>
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}
@@ -714,7 +802,45 @@ function InventoryView() {
     toDate: "",
   });
   const [selectedLocationCode, setSelectedLocationCode] = useState("A-01-03");
-  const rows = filterByOperation(inventoryRows, filters, (row) => row.lastMovedAt, [
+  const inventoryQueryParams = useMemo(
+    () => ({
+      clientCompanyId: clientIdByName[filters.client],
+      warehouseId: warehouseIdByName[filters.warehouse],
+      status: filters.status === "전체" ? undefined : filters.status,
+      keyword: filters.keyword,
+    }),
+    [filters.client, filters.keyword, filters.status, filters.warehouse],
+  );
+  const inventoriesQuery = useQuery({
+    queryKey: ["inventories", inventoryQueryParams],
+    queryFn: () => warehouseApi.searchInventories(inventoryQueryParams),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const apiRows = useMemo<InventoryRow[] | null>(() => {
+    if (!inventoriesQuery.data) {
+      return null;
+    }
+
+    return inventoriesQuery.data.map((inventory) => ({
+      sku: inventory.skuCode,
+      name: inventory.skuName,
+      client: inventory.clientCompanyName,
+      warehouse: inventory.warehouseName,
+      location: inventory.locationCode,
+      lot: "LOCAL",
+      available: inventory.availableQuantity,
+      allocated: inventory.allocatedQuantity,
+      hold: inventory.holdQuantity,
+      lastMovedAt: inventory.updatedAt.slice(0, 10),
+      status: inventory.status,
+    }));
+  }, [inventoriesQuery.data]);
+  const sourceRows = inventoriesQuery.isError || !apiRows ? inventoryRows : apiRows;
+  const effectiveFilters = apiRows && !inventoriesQuery.isError
+    ? { ...filters, client: "전체", warehouse: "전체", status: "전체", keyword: "" }
+    : filters;
+  const rows = filterByOperation(sourceRows, effectiveFilters, (row) => row.lastMovedAt, [
     "sku",
     "name",
     "client",
@@ -726,10 +852,19 @@ function InventoryView() {
   const selectedLocation =
     locationCells.find((location) => location.code === selectedLocationCode) ?? locationCells[0];
   const selectedLocationInventory = rows.filter((row) => row.location === selectedLocation.code);
+  const dataModeLabel = inventoriesQuery.isError
+    ? "API 연결 실패 / 데모 데이터 표시"
+    : inventoriesQuery.isFetching
+      ? "API 동기화 중"
+      : "API 데이터";
 
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="재고 레코드" actions={["재고 이동", "보류 전환", "CSV"]} />
+      <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
+        <span className="font-medium text-[#2f3a42]">데이터 소스</span>
+        <span className={inventoriesQuery.isError ? "text-[#b42318]" : "text-[#1b5e57]"}>{dataModeLabel}</span>
+      </div>
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}

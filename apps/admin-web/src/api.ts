@@ -45,11 +45,81 @@ export type ApiOutboundOrderDetail = {
   lines: ApiOutboundOrderLine[];
 };
 
+export type ApiReceivingOrderStatus =
+  | "DRAFT"
+  | "REQUESTED"
+  | "RECEIVING"
+  | "PUTAWAY"
+  | "COMPLETED"
+  | "CANCELED";
+
+export type ApiReceivingOrderLine = {
+  id: number;
+  lineNo: number;
+  skuId: number;
+  skuCode: string;
+  skuName: string;
+  requestedQuantity: number;
+  receivedQuantity: number;
+  putawayQuantity: number;
+};
+
+export type ApiReceivingOrder = {
+  id: number;
+  receivingNo: string;
+  clientCompanyId: number;
+  clientCompanyName: string;
+  warehouseId: number;
+  warehouseName: string;
+  status: ApiReceivingOrderStatus;
+  supplierName: string | null;
+  requestedBy: string;
+  requestedQuantity: number;
+  receivedQuantity: number;
+  putawayQuantity: number;
+  createdAt: string;
+  lines: ApiReceivingOrderLine[];
+};
+
+export type ApiInventory = {
+  id: number;
+  clientCompanyId: number;
+  clientCompanyName: string;
+  warehouseId: number;
+  warehouseName: string;
+  locationId: number;
+  locationCode: string;
+  locationZone: string | null;
+  skuId: number;
+  skuCode: string;
+  skuName: string;
+  availableQuantity: number;
+  allocatedQuantity: number;
+  holdQuantity: number;
+  status: string;
+  updatedAt: string;
+};
+
 export type OutboundOrderSearchParams = {
   clientCompanyId?: number;
   status?: ApiOutboundOrderStatus;
   requestedShipDateFrom?: string;
   requestedShipDateTo?: string;
+};
+
+export type ReceivingOrderSearchParams = {
+  clientCompanyId?: number;
+  warehouseId?: number;
+  status?: ApiReceivingOrderStatus;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+export type InventorySearchParams = {
+  clientCompanyId?: number;
+  warehouseId?: number;
+  status?: string;
+  keyword?: string;
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -81,4 +151,8 @@ export const warehouseApi = {
     request<ApiOutboundOrder[]>(`/api/outbound-orders${toQueryString(params)}`),
   getOutboundOrderDetail: (orderId: number) =>
     request<ApiOutboundOrderDetail>(`/api/outbound-orders/${orderId}`),
+  searchReceivingOrders: (params: ReceivingOrderSearchParams) =>
+    request<ApiReceivingOrder[]>(`/api/receiving-orders${toQueryString(params)}`),
+  searchInventories: (params: InventorySearchParams) =>
+    request<ApiInventory[]>(`/api/inventories${toQueryString(params)}`),
 };
