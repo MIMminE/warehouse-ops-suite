@@ -100,6 +100,51 @@ export type ApiInventory = {
   updatedAt: string;
 };
 
+export type ApiClientCompany = {
+  id: number;
+  code: string;
+  name: string;
+  active: boolean;
+};
+
+export type ApiWarehouse = {
+  id: number;
+  code: string;
+  name: string;
+};
+
+export type ApiDashboard = {
+  metrics: {
+    receivingOrderCount: number;
+    receivingRequestedQuantity: number;
+    inventoryAvailableQuantity: number;
+    inventoryAllocatedQuantity: number;
+    inventoryHoldQuantity: number;
+    outboundOrderCount: number;
+    outboundNeedsAttentionCount: number;
+    pickingTaskCount: number;
+    pickingPickedQuantity: number;
+  };
+  issueQueue: Array<{
+    label: string;
+    count: number;
+    description: string;
+  }>;
+  clientSla: Array<{
+    clientCompanyName: string;
+    rate: number;
+  }>;
+  recentReceiving: ApiDashboardListItem[];
+  recentOutbound: ApiDashboardListItem[];
+  inventoryAlerts: ApiDashboardListItem[];
+};
+
+export type ApiDashboardListItem = {
+  label: string;
+  description: string;
+  status: string;
+};
+
 export type OutboundOrderSearchParams = {
   clientCompanyId?: number;
   status?: ApiOutboundOrderStatus;
@@ -147,6 +192,9 @@ const toQueryString = (params: Record<string, string | number | undefined>) => {
 
 export const warehouseApi = {
   getHealth: () => request<{ status: string }>("/actuator/health"),
+  getDashboard: () => request<ApiDashboard>("/api/dashboard"),
+  getClientCompanies: () => request<ApiClientCompany[]>("/api/client-companies"),
+  getWarehouses: () => request<ApiWarehouse[]>("/api/warehouses"),
   searchOutboundOrders: (params: OutboundOrderSearchParams) =>
     request<ApiOutboundOrder[]>(`/api/outbound-orders${toQueryString(params)}`),
   getOutboundOrderDetail: (orderId: number) =>

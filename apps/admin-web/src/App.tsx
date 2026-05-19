@@ -596,24 +596,64 @@ export function App() {
 }
 
 function Dashboard() {
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: warehouseApi.getDashboard,
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const dashboard = dashboardQuery.data;
+  const issueRows = dashboard?.issueQueue.map((issue) => [
+    issue.label,
+    `${issue.count.toLocaleString()}건`,
+    issue.description,
+  ]) ?? [
+    ["입고 검수 대기", `${receivingRows.filter((row) => row.status === "검수중").length}건`, "검수 수량 반영 후 적치 작업 생성"],
+    ["출고 할당 실패", `${outboundRows.filter((row) => row.status === "재고부족").length}건`, "가용 재고와 보류 재고 확인"],
+    ["DPS 웨이브 대기", `${pickingRows.filter((row) => row.zone === "DPS" && row.status === "대기").length}건`, "DPS Agent 연결 후 작업 시작"],
+    ["보류 재고", `${inventoryRows.filter((row) => row.hold > 0).length}건`, "파손/검수 이슈 처리 필요"],
+  ];
+  const clientSlaRows = dashboard?.clientSla ?? clientOptions.slice(1).map((client) => {
+    const clientOutbound = outboundRows.filter((row) => row.client === client);
+    const completed = clientOutbound.filter((row) => row.status === "피킹완료").length;
+    const rate = clientOutbound.length ? Math.round((completed / clientOutbound.length) * 100) : 0;
+    return { clientCompanyName: client, rate };
+  });
+  const recentReceivingRows = dashboard?.recentReceiving ?? receivingRows.slice(0, 4).map((row) => ({
+    label: row.no,
+    description: `${row.client} / ${row.warehouse} / ${row.worker}`,
+    status: row.status,
+  }));
+  const recentOutboundRows = dashboard?.recentOutbound ?? outboundRows.slice(0, 4).map((row) => ({
+    label: row.no,
+    description: `${row.client} / ${row.recipient} / ${row.channel}`,
+    status: row.status,
+  }));
+  const inventoryAlertRows = dashboard?.inventoryAlerts ?? inventoryRows.filter((row) => row.status !== "정상").map((row) => ({
+    label: row.sku,
+    description: `${row.client} / ${row.location} / 보류 ${row.hold.toLocaleString()}`,
+    status: row.status,
+  }));
+  const dataModeLabel = dashboardQuery.isError
+    ? "API 연결 실패 / 데모 데이터 표시"
+    : dashboardQuery.isFetching
+      ? "API 동기화 중"
+      : "API 데이터";
+
   return (
     <div className="grid gap-5">
+      <DataSourceNotice label={dataModeLabel} failed={dashboardQuery.isError} />
       <div className="grid grid-cols-4 gap-4 max-xl:grid-cols-2 max-sm:grid-cols-1">
-        <Metric label="입고 진행" value={receivingRows.length.toLocaleString()} sub={`검수/적치 대상 ${sum(receivingRows, "requested").toLocaleString()}개`} icon={PackageCheck} tone="green" />
-        <Metric label="가용 재고" value={sum(inventoryRows, "available").toLocaleString()} sub={`할당 ${sum(inventoryRows, "allocated").toLocaleString()} / 보류 ${sum(inventoryRows, "hold").toLocaleString()}`} icon={Boxes} tone="blue" />
-        <Metric label="출고 지시" value={outboundRows.length.toLocaleString()} sub={`${outboundRows.filter((row) => row.status === "재고부족").length}건 재고 확인 필요`} icon={Truck} tone="amber" />
-        <Metric label="피킹 작업" value={sum(pickingRows, "tasks").toLocaleString()} sub={`완료 ${sum(pickingRows, "picked").toLocaleString()} / 전체 ${sum(pickingRows, "tasks").toLocaleString()}`} icon={ClipboardList} tone="slate" />
+        <Metric label="입고 진행" value={(dashboard?.metrics.receivingOrderCount ?? receivingRows.length).toLocaleString()} sub={`검수/적치 대상 ${(dashboard?.metrics.receivingRequestedQuantity ?? sum(receivingRows, "requested")).toLocaleString()}개`} icon={PackageCheck} tone="green" />
+        <Metric label="가용 재고" value={(dashboard?.metrics.inventoryAvailableQuantity ?? sum(inventoryRows, "available")).toLocaleString()} sub={`할당 ${(dashboard?.metrics.inventoryAllocatedQuantity ?? sum(inventoryRows, "allocated")).toLocaleString()} / 보류 ${(dashboard?.metrics.inventoryHoldQuantity ?? sum(inventoryRows, "hold")).toLocaleString()}`} icon={Boxes} tone="blue" />
+        <Metric label="출고 지시" value={(dashboard?.metrics.outboundOrderCount ?? outboundRows.length).toLocaleString()} sub={`${(dashboard?.metrics.outboundNeedsAttentionCount ?? outboundRows.filter((row) => row.status === "재고부족").length).toLocaleString()}건 재고 확인 필요`} icon={Truck} tone="amber" />
+        <Metric label="피킹 작업" value={(dashboard?.metrics.pickingTaskCount ?? sum(pickingRows, "tasks")).toLocaleString()} sub={`완료 ${(dashboard?.metrics.pickingPickedQuantity ?? sum(pickingRows, "picked")).toLocaleString()} / 전체 ${(dashboard?.metrics.pickingTaskCount ?? sum(pickingRows, "tasks")).toLocaleString()}`} icon={ClipboardList} tone="slate" />
       </div>
 
       <div className="grid grid-cols-[1.25fr_0.75fr] gap-5 max-xl:grid-cols-1">
         <SectionPanel title="운영 이슈 큐" action="조회">
           <div className="grid gap-2">
-            {[
-              ["입고 검수 대기", `${receivingRows.filter((row) => row.status === "검수중").length}건`, "검수 수량 반영 후 적치 작업 생성"],
-              ["출고 할당 실패", `${outboundRows.filter((row) => row.status === "재고부족").length}건`, "가용 재고와 보류 재고 확인"],
-              ["DPS 웨이브 대기", `${pickingRows.filter((row) => row.zone === "DPS" && row.status === "대기").length}건`, "DPS Agent 연결 후 작업 시작"],
-              ["보류 재고", `${inventoryRows.filter((row) => row.hold > 0).length}건`, "파손/검수 이슈 처리 필요"],
-            ].map(([label, count, desc]) => (
+            {issueRows.map(([label, count, desc]) => (
               <div key={label} className="grid grid-cols-[1fr_auto] items-center border-b border-[#e0e6e8] py-3 last:border-b-0">
                 <div>
                   <p className="text-sm font-medium">{label}</p>
@@ -627,14 +667,9 @@ function Dashboard() {
 
         <SectionPanel title="고객사별 처리 현황" action="SLA">
           <div className="grid gap-3">
-            {clientOptions.slice(1).map((client) => {
-              const clientOutbound = outboundRows.filter((row) => row.client === client);
-              const completed = clientOutbound.filter((row) => row.status === "피킹완료").length;
-              const rate = clientOutbound.length ? Math.round((completed / clientOutbound.length) * 100) : 0;
-              return (
-                <ProgressRow key={client} label={client} value={`${rate}%`} progress={rate} />
-              );
-            })}
+            {clientSlaRows.map((row) => (
+              <ProgressRow key={row.clientCompanyName} label={row.clientCompanyName} value={`${row.rate}%`} progress={row.rate} />
+            ))}
           </div>
         </SectionPanel>
       </div>
@@ -642,27 +677,15 @@ function Dashboard() {
       <div className="grid grid-cols-3 gap-5 max-xl:grid-cols-1">
         <MiniList
           title="최근 입고 내역"
-          rows={receivingRows.slice(0, 4).map((row) => ({
-            label: row.no,
-            description: `${row.client} / ${row.warehouse} / ${row.worker}`,
-            status: row.status,
-          }))}
+          rows={recentReceivingRows}
         />
         <MiniList
           title="최근 출고 내역"
-          rows={outboundRows.slice(0, 4).map((row) => ({
-            label: row.no,
-            description: `${row.client} / ${row.recipient} / ${row.channel}`,
-            status: row.status,
-          }))}
+          rows={recentOutboundRows}
         />
         <MiniList
           title="재고 주의"
-          rows={inventoryRows.filter((row) => row.status !== "정상").map((row) => ({
-            label: row.sku,
-            description: `${row.client} / ${row.location} / 보류 ${row.hold.toLocaleString()}`,
-            status: row.status,
-          }))}
+          rows={inventoryAlertRows}
         />
       </div>
     </div>
@@ -763,10 +786,7 @@ function ReceivingView() {
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="PDA 입고 작업" actions={["입고 지시 등록", "PDA 현황", "엑셀"]} />
-      <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
-        <span className="font-medium text-[#2f3a42]">데이터 소스</span>
-        <span className={receivingOrdersQuery.isError ? "text-[#b42318]" : "text-[#1b5e57]"}>{dataModeLabel}</span>
-      </div>
+      <DataSourceNotice label={dataModeLabel} failed={receivingOrdersQuery.isError} />
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}
@@ -861,10 +881,7 @@ function InventoryView() {
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="재고 레코드" actions={["재고 이동", "보류 전환", "CSV"]} />
-      <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
-        <span className="font-medium text-[#2f3a42]">데이터 소스</span>
-        <span className={inventoriesQuery.isError ? "text-[#b42318]" : "text-[#1b5e57]"}>{dataModeLabel}</span>
-      </div>
+      <DataSourceNotice label={dataModeLabel} failed={inventoriesQuery.isError} />
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}
@@ -984,10 +1001,7 @@ function OutboundView() {
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="출고 지시" actions={["지시 등록", "일괄 할당", "엑셀"]} />
-      <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
-        <span className="font-medium text-[#2f3a42]">데이터 소스</span>
-        <span className={outboundOrdersQuery.isError ? "text-[#b42318]" : "text-[#1b5e57]"}>{dataModeLabel}</span>
-      </div>
+      <DataSourceNotice label={dataModeLabel} failed={outboundOrdersQuery.isError} />
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}
@@ -1386,6 +1400,20 @@ function CompactFilterBar({
   fields: Array<"client" | "warehouse" | "status" | "date" | "keyword">;
 }) {
   const update = (patch: Partial<OperationFilters>) => onChange({ ...filters, ...patch });
+  const clientsQuery = useQuery({
+    queryKey: ["client-companies"],
+    queryFn: warehouseApi.getClientCompanies,
+    retry: 1,
+    staleTime: 60_000,
+  });
+  const warehousesQuery = useQuery({
+    queryKey: ["warehouses"],
+    queryFn: warehouseApi.getWarehouses,
+    retry: 1,
+    staleTime: 60_000,
+  });
+  const liveClientOptions = clientsQuery.data ? ["전체", ...clientsQuery.data.map((client) => client.name)] : clientOptions;
+  const liveWarehouseOptions = warehousesQuery.data ? ["전체", ...warehousesQuery.data.map((warehouse) => warehouse.name)] : warehouseOptions;
 
   return (
     <section className="rounded-md border border-[#d7dee2] bg-white px-4 py-3">
@@ -1396,10 +1424,10 @@ function CompactFilterBar({
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
           {fields.includes("client") && (
-            <SelectField label="고객사" value={filters.client} options={clientOptions} onChange={(client) => update({ client })} compact />
+            <SelectField label="고객사" value={filters.client} options={liveClientOptions} onChange={(client) => update({ client })} compact />
           )}
           {fields.includes("warehouse") && (
-            <SelectField label="창고" value={filters.warehouse} options={warehouseOptions} onChange={(warehouse) => update({ warehouse })} compact />
+            <SelectField label="창고" value={filters.warehouse} options={liveWarehouseOptions} onChange={(warehouse) => update({ warehouse })} compact />
           )}
           {fields.includes("status") && (
             <SelectField label="상태" value={filters.status} options={statusOptions} onChange={(status) => update({ status })} compact />
@@ -1453,6 +1481,15 @@ function ResultToolbar({ count, label, actions }: { count: number; label: string
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function DataSourceNotice({ label, failed }: { label: string; failed: boolean }) {
+  return (
+    <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
+      <span className="font-medium text-[#2f3a42]">데이터 소스</span>
+      <span className={failed ? "text-[#b42318]" : "text-[#1b5e57]"}>{label}</span>
     </div>
   );
 }
