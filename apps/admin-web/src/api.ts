@@ -145,6 +145,54 @@ export type ApiDashboardListItem = {
   status: string;
 };
 
+export type ApiOutboundWaveStatus =
+  | "READY"
+  | "ALLOCATED"
+  | "PICKING"
+  | "COMPLETED"
+  | "CANCELED";
+
+export type ApiPickingTaskStatus =
+  | "READY"
+  | "ASSIGNED"
+  | "PICKING"
+  | "COMPLETED"
+  | "CANCELED";
+
+export type ApiOutboundWavePickingTask = {
+  id: number;
+  taskNo: string;
+  outboundOrderLineId: number | null;
+  outboundOrderNo: string | null;
+  receiverName: string | null;
+  sourceLocationId: number;
+  sourceLocationCode: string;
+  skuId: number;
+  skuCode: string;
+  skuName: string;
+  status: ApiPickingTaskStatus;
+  requestedQuantity: number;
+  pickedQuantity: number;
+  assignedWorker: string | null;
+};
+
+export type ApiOutboundWave = {
+  id: number;
+  waveNo: string;
+  clientCompanyId: number;
+  clientCompanyName: string;
+  warehouseId: number;
+  warehouseName: string;
+  status: ApiOutboundWaveStatus;
+  requestedBy: string;
+  createdAt: string;
+  orderCount: number;
+  taskCount: number;
+  requestedQuantity: number;
+  pickedQuantity: number;
+  pickingTasks: ApiOutboundWavePickingTask[];
+};
+
 export type OutboundOrderSearchParams = {
   clientCompanyId?: number;
   status?: ApiOutboundOrderStatus;
@@ -165,6 +213,14 @@ export type InventorySearchParams = {
   warehouseId?: number;
   status?: string;
   keyword?: string;
+};
+
+export type OutboundWaveSearchParams = {
+  clientCompanyId?: number;
+  warehouseId?: number;
+  status?: ApiOutboundWaveStatus;
+  createdFrom?: string;
+  createdTo?: string;
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
@@ -203,4 +259,8 @@ export const warehouseApi = {
     request<ApiReceivingOrder[]>(`/api/receiving-orders${toQueryString(params)}`),
   searchInventories: (params: InventorySearchParams) =>
     request<ApiInventory[]>(`/api/inventories${toQueryString(params)}`),
+  searchOutboundWaves: (params: OutboundWaveSearchParams) =>
+    request<ApiOutboundWave[]>(`/api/outbound-waves${toQueryString(params)}`),
+  getOutboundWaveDetail: (waveId: number) =>
+    request<ApiOutboundWave>(`/api/outbound-waves/${waveId}`),
 };

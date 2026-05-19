@@ -22,7 +22,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { type ApiOutboundOrderStatus, type ApiReceivingOrderStatus, warehouseApi } from "./api";
+import { type ApiOutboundOrderStatus, type ApiOutboundWaveStatus, type ApiReceivingOrderStatus, warehouseApi } from "./api";
 
 type AdminSection =
   | "dashboard"
@@ -146,6 +146,7 @@ type OutboundRow = {
 };
 
 type PickingRow = {
+  id?: number;
   wave: string;
   client: string;
   warehouse: string;
@@ -154,6 +155,7 @@ type PickingRow = {
   orders: number;
   tasks: number;
   picked: number;
+  invoiceCount?: number;
   status: string;
 };
 
@@ -252,6 +254,20 @@ const receivingStatusLabel: Record<ApiReceivingOrderStatus, string> = {
   RECEIVING: "검수중",
   PUTAWAY: "적치중",
   COMPLETED: "적치완료",
+  CANCELED: "취소",
+};
+const outboundWaveStatusToApi: Partial<Record<string, ApiOutboundWaveStatus>> = {
+  대기: "READY",
+  할당완료: "ALLOCATED",
+  진행중: "PICKING",
+  완료: "COMPLETED",
+  취소: "CANCELED",
+};
+const outboundWaveStatusLabel: Record<ApiOutboundWaveStatus, string> = {
+  READY: "대기",
+  ALLOCATED: "할당완료",
+  PICKING: "진행중",
+  COMPLETED: "완료",
   CANCELED: "취소",
 };
 
@@ -1043,8 +1059,47 @@ function PickingView() {
     ...defaultFilters,
     warehouse: "전체",
   });
-  const [selectedWave, setSelectedWave] = useState(pickingRows[0]?.wave ?? "");
-  const rows = filterByOperation(pickingRows, filters, (row) => row.startedAt, [
+  const waveQueryParams = useMemo(
+    () => ({
+      clientCompanyId: clientIdByName[filters.client],
+      warehouseId: warehouseIdByName[filters.warehouse],
+      status: outboundWaveStatusToApi[filters.status],
+      createdFrom: filters.fromDate,
+      createdTo: filters.toDate,
+    }),
+    [filters.client, filters.fromDate, filters.status, filters.toDate, filters.warehouse],
+  );
+  const wavesQuery = useQuery({
+    queryKey: ["outbound-waves", waveQueryParams],
+    queryFn: () => warehouseApi.searchOutboundWaves(waveQueryParams),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const apiRows = useMemo<PickingRow[] | null>(() => {
+    if (!wavesQuery.data) {
+      return null;
+    }
+
+    return wavesQuery.data.map((wave) => ({
+      id: wave.id,
+      wave: wave.waveNo,
+      client: wave.clientCompanyName,
+      warehouse: wave.warehouseName,
+      zone: wave.pickingTasks.some((task) => task.assignedWorker === "DPS") ? "DPS" : "PDA",
+      startedAt: wave.createdAt,
+      orders: wave.orderCount,
+      tasks: wave.requestedQuantity,
+      picked: wave.pickedQuantity,
+      invoiceCount: wave.orderCount,
+      status: outboundWaveStatusLabel[wave.status],
+    }));
+  }, [wavesQuery.data]);
+  const sourceRows = wavesQuery.isError || !apiRows ? pickingRows : apiRows;
+  const effectiveFilters = apiRows && !wavesQuery.isError
+    ? { ...filters, client: "전체", warehouse: "전체", status: "전체" }
+    : filters;
+  const [selectedWave, setSelectedWave] = useState(sourceRows[0]?.wave ?? "");
+  const rows = filterByOperation(sourceRows, effectiveFilters, (row) => row.startedAt, [
     "wave",
     "client",
     "warehouse",
@@ -1052,13 +1107,41 @@ function PickingView() {
     "status",
   ]);
   const selectedPickingWave = rows.find((row) => row.wave === selectedWave) ?? rows[0];
+  const waveDetailQuery = useQuery({
+    queryKey: ["outbound-wave-detail", selectedPickingWave?.id],
+    queryFn: () => warehouseApi.getOutboundWaveDetail(selectedPickingWave?.id ?? 0),
+    enabled: Boolean(selectedPickingWave?.id),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const apiWaveInvoices = waveDetailQuery.data?.pickingTasks.map((task) => ({
+    wave: waveDetailQuery.data.waveNo,
+    invoiceNo: task.taskNo,
+    outboundNo: task.outboundOrderNo ?? "-",
+    client: waveDetailQuery.data.clientCompanyName,
+    recipient: task.receiverName ?? "-",
+    sku: task.skuCode,
+    product: task.skuName,
+    location: task.sourceLocationCode,
+    quantity: task.requestedQuantity,
+    picked: task.pickedQuantity,
+    worker: task.assignedWorker ?? "-",
+    device: task.assignedWorker === "DPS" ? "DPS-AGENT" : "PDA",
+    status: task.status === "COMPLETED" ? "완료" : task.status === "PICKING" ? "진행중" : "대기",
+  }));
   const selectedWaveInvoices = selectedPickingWave
-    ? waveInvoiceRows.filter((invoice) => invoice.wave === selectedPickingWave.wave)
+    ? apiWaveInvoices ?? waveInvoiceRows.filter((invoice) => invoice.wave === selectedPickingWave.wave)
     : [];
+  const dataModeLabel = wavesQuery.isError
+    ? "API 연결 실패 / 데모 데이터 표시"
+    : wavesQuery.isFetching
+      ? "API 동기화 중"
+      : "API 데이터";
 
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="피킹 웨이브" actions={["웨이브 생성", "DPS 전송", "작업 배정"]} />
+      <DataSourceNotice label={dataModeLabel} failed={wavesQuery.isError} />
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}
@@ -1581,7 +1664,7 @@ function PickingWaveTable({
         <tbody>
           {rows.map((row) => {
             const selected = row.wave === selectedWave;
-            const invoiceCount = waveInvoiceRows.filter((invoice) => invoice.wave === row.wave).length;
+            const invoiceCount = row.invoiceCount ?? waveInvoiceRows.filter((invoice) => invoice.wave === row.wave).length;
             return (
               <tr
                 key={row.wave}

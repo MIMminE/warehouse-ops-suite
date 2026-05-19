@@ -10,8 +10,12 @@ import dev.portfolio.warehouse.api.domain.warehouse.WarehouseRepository
 import dev.portfolio.warehouse.api.support.error.BadRequestException
 import dev.portfolio.warehouse.api.support.error.DuplicateResourceException
 import dev.portfolio.warehouse.api.support.error.NotFoundException
+import jakarta.persistence.criteria.JoinType
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 
 @Service
 class OutboundWaveService(
@@ -22,6 +26,39 @@ class OutboundWaveService(
     private val outboundOrderLineAllocationRepository: OutboundOrderLineAllocationRepository,
     private val pickingTaskRepository: PickingTaskRepository,
 ) {
+    @Transactional(readOnly = true)
+    fun search(
+        clientCompanyId: Long?,
+        warehouseId: Long?,
+        status: OutboundWaveStatus?,
+        createdFrom: LocalDate?,
+        createdTo: LocalDate?,
+    ): List<OutboundWaveResponse> {
+        val waves = outboundWaveRepository.findAll(
+            outboundWaveSearchSpec(
+                clientCompanyId = clientCompanyId,
+                warehouseId = warehouseId,
+                status = status,
+                createdFrom = createdFrom,
+                createdTo = createdTo,
+            ),
+            Sort.by(Sort.Direction.DESC, "id"),
+        )
+
+        return waves.map { wave ->
+            val tasks = pickingTaskRepository.findByOutboundWaveIdOrderById(requireNotNull(wave.id))
+            wave.toResponse(tasks)
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun getDetail(waveId: Long): OutboundWaveResponse {
+        val wave = outboundWaveRepository.findById(waveId)
+            .orElseThrow { NotFoundException("출고 웨이브를 찾을 수 없습니다: $waveId") }
+        val tasks = pickingTaskRepository.findByOutboundWaveIdOrderById(waveId)
+        return wave.toResponse(tasks)
+    }
+
     @Transactional
     fun create(request: CreateOutboundWaveRequest): OutboundWaveResponse {
         if (outboundWaveRepository.existsByWaveNo(request.waveNo)) {
@@ -84,3 +121,35 @@ class OutboundWaveService(
         return wave.toResponse(tasks)
     }
 }
+
+private fun outboundWaveSearchSpec(
+    clientCompanyId: Long?,
+    warehouseId: Long?,
+    status: OutboundWaveStatus?,
+    createdFrom: LocalDate?,
+    createdTo: LocalDate?,
+): Specification<OutboundWaveEntity> =
+    Specification { root, _, criteriaBuilder ->
+        root.fetch<Any, Any>("clientCompany", JoinType.LEFT)
+        root.fetch<Any, Any>("warehouse", JoinType.LEFT)
+
+        val predicates = listOfNotNull(
+            clientCompanyId?.let {
+                criteriaBuilder.equal(root.get<Any>("clientCompany").get<Long>("id"), it)
+            },
+            warehouseId?.let {
+                criteriaBuilder.equal(root.get<Any>("warehouse").get<Long>("id"), it)
+            },
+            status?.let {
+                criteriaBuilder.equal(root.get<OutboundWaveStatus>("status"), it)
+            },
+            createdFrom?.let {
+                criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), it.atStartOfDay())
+            },
+            createdTo?.let {
+                criteriaBuilder.lessThan(root.get("createdAt"), it.plusDays(1).atStartOfDay())
+            },
+        )
+
+        criteriaBuilder.and(*predicates.toTypedArray())
+    }
