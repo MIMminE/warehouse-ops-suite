@@ -72,7 +72,7 @@ Warehouse Ops Suite는 3PL 물류 운영 흐름을 포트폴리오용으로 재�
 | --- | --- | --- |
 | Admin Web build | `pnpm --filter @warehouse/admin-web build` | 성공 |
 | Admin Web lint | `pnpm --filter @warehouse/admin-web lint` | 성공 |
-| API/Print Agent compile | `gradle --no-daemon :services:api-server:compileKotlin :apps:print-agent:compileKotlin` | 성공 |
+| API/Print Agent compile | `./gradlew --no-daemon :services:api-server:compileKotlin :apps:print-agent:compileKotlin` | 성공 |
 | DPS 전송 | `POST /api/outbound-waves/3/dispatch-dps` | `PICKING_BATCH_ACCEPTED` |
 | Print Agent 큐 등록 | `POST /api/outbound-waves/3/print-jobs/picking-list` | `QUEUED` |
 

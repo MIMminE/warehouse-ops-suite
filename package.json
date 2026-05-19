@@ -6,8 +6,11 @@
   "scripts": {
     "dev:admin": "pnpm --filter @warehouse/admin-web dev",
     "dev:pdf": "pnpm --filter @warehouse/pdf-renderer dev",
+    "test:jvm": "GRADLE_USER_HOME=.gradle-user ./gradlew --no-daemon :services:api-server:test :apps:print-agent:test :apps:dps-protocol-agent:test",
     "build:admin": "pnpm --filter @warehouse/admin-web build",
     "build:pdf": "pnpm --filter @warehouse/pdf-renderer build",
+    "build:jvm": "GRADLE_USER_HOME=.gradle-user ./gradlew --no-daemon :services:api-server:compileKotlin :apps:print-agent:compileKotlin :apps:dps-protocol-agent:compileKotlin",
+    "verify": "pnpm lint && pnpm typecheck && pnpm build:admin && pnpm build:pdf && pnpm test:jvm",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint"
   },
@@ -15,4 +18,3 @@
     "typescript": "^5.7.2"
   }
 }
-

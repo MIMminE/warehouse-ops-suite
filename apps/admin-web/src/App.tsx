@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { type ApiOutboundOrderStatus, type ApiOutboundWaveStatus, type ApiReceivingOrderStatus, warehouseApi } from "./api";
+import { appConfig } from "./config";
 
 type AdminSection =
   | "dashboard"
@@ -533,13 +534,13 @@ const waveInvoiceRows: WaveInvoiceRow[] = [
 ];
 
 const systemServiceRows = [
-  { name: "API Server", endpoint: "http://localhost:8080", status: "설계 완료", note: "출고/입고/피킹 API" },
-  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "연결 가능", note: "송장/피킹리스트 PDF 렌더링" },
+  { name: "API Server", endpoint: appConfig.serviceEndpoints.apiServer, status: "설계 완료", note: "출고/입고/피킹 API" },
+  { name: "PDF Renderer", endpoint: appConfig.serviceEndpoints.pdfRenderer, status: "연결 가능", note: "송장/피킹리스트 PDF 렌더링" },
 ];
 
 const localAgentRows = [
-  { name: "DPS Protocol Agent", endpoint: "ws://localhost:4030/ws/dps", status: "연결 가능", note: "피킹 배치 시뮬레이터" },
-  { name: "Print Agent", endpoint: "http://localhost:4020", status: "연결 가능", note: "송장/피킹리스트 출력 큐" },
+  { name: "DPS Protocol Agent", endpoint: appConfig.serviceEndpoints.dpsAgent, status: "연결 가능", note: "피킹 배치 시뮬레이터" },
+  { name: "Print Agent", endpoint: appConfig.serviceEndpoints.printAgent, status: "연결 가능", note: "송장/피킹리스트 출력 큐" },
   { name: "PDA Sync Client", endpoint: "Android local storage", status: "MVP", note: "입고/적치 작업 화면" },
 ];
 
@@ -1402,7 +1403,7 @@ function DpsMonitor() {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket("ws://localhost:4030/ws/dps");
+    const socket = new WebSocket(appConfig.dpsWebSocketUrl);
     socketRef.current = socket;
     socket.onopen = () => setConnected(true);
     socket.onclose = () => setConnected(false);
@@ -1417,7 +1418,7 @@ function DpsMonitor() {
 
   async function refreshSnapshot() {
     try {
-      const response = await fetch("/dps-agent/simulator/state");
+      const response = await fetch(`${appConfig.dpsAgentBasePath}/simulator/state`);
       if (response.ok) {
         setSnapshot((await response.json()) as DpsSimulatorSnapshot);
       }
@@ -1444,7 +1445,7 @@ function DpsMonitor() {
   }
 
   async function confirmCell(cellCode: string, quantity: number) {
-    await fetch(`/dps-agent/simulator/cells/${cellCode}/confirm`, {
+    await fetch(`${appConfig.dpsAgentBasePath}/simulator/cells/${cellCode}/confirm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pickedQuantity: quantity }),
@@ -1460,7 +1461,7 @@ function DpsMonitor() {
             <StatusDot active={connected} />
             <h2 className="text-base font-semibold">DPS Protocol Agent</h2>
           </div>
-          <p className="mt-1 text-sm text-[#6b7780]">ws://localhost:4030/ws/dps</p>
+          <p className="mt-1 text-sm text-[#6b7780]">{appConfig.dpsWebSocketUrl}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <IconButton label="새로고침" onClick={refreshSnapshot} icon={RefreshCcw} />
