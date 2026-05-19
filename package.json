@@ -10,6 +10,7 @@
     "build:admin": "pnpm --filter @warehouse/admin-web build",
     "build:pdf": "pnpm --filter @warehouse/pdf-renderer build",
     "build:jvm": "GRADLE_USER_HOME=.gradle-user ./gradlew --no-daemon :services:api-server:compileKotlin :apps:print-agent:compileKotlin :apps:dps-protocol-agent:compileKotlin",
+    "portfolio:package": "node scripts/build-portfolio-package.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm build:admin && pnpm build:pdf && pnpm test:jvm",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint"

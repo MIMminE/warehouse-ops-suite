@@ -1,0 +1,22 @@
+{
+  "id": "warehouse-ops-suite",
+  "title": "Warehouse Ops Suite",
+  "subtitle": "3PL 물류센터 WMS 운영 시스템",
+  "category": "실무 도메인형",
+  "status": "Portfolio Ready",
+  "summary": "입고, 적치, 재고, 출고 지시, 피킹 웨이브, DPS, PDA, 송장 출력까지 하나의 운영 흐름으로 연결한 WMS 포트폴리오입니다.",
+  "stacks": [
+    "Kotlin",
+    "Spring Boot",
+    "React",
+    "TypeScript",
+    "PostgreSQL",
+    "Flyway",
+    "Ktor",
+    "Flutter"
+  ],
+  "repoUrl": "https://github.com/MIMminE/warehouse-ops-suite",
+  "article": "blog/article.md",
+  "coverImage": "blog/images/01-dashboard.png",
+  "coverAlt": "Warehouse Ops Suite 운영 현황 대시보드"
+}
