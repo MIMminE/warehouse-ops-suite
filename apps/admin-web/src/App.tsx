@@ -189,7 +189,7 @@ const navItems: Array<{ id: AdminSection; label: string; icon: typeof LayoutDash
   { id: "outbound", label: "출고 지시", icon: Truck },
   { id: "picking", label: "피킹 웨이브", icon: ClipboardList },
   { id: "dps", label: "DPS 모니터", icon: RadioTower },
-  { id: "agents", label: "로컬 에이전트", icon: PlugZap },
+  { id: "agents", label: "시스템 연결", icon: PlugZap },
 ];
 
 const defaultFilters: OperationFilters = {
