@@ -4,28 +4,15 @@
   "subtitle": "3PL 물류센터 WMS 운영 시스템",
   "category": "실무 도메인형",
   "status": "Portfolio Ready",
-  "description": "입고, 적치, 재고, 출고 지시, 피킹 웨이브, DPS, PDA, 송장 출력까지 하나의 운영 흐름으로 연결한 WMS 포트폴리오입니다.",
-  "problem": "물류 운영 시스템은 단순 CRUD가 아니라 고객사별 재고 소유권, 현장 작업, 로컬 장비, 출력 실패까지 함께 관리해야 합니다.",
-  "solution": "Admin Web, API Server, PDA App, DPS Protocol Agent, Print Agent, PDF Renderer를 분리하고 HTTP/WebSocket 기반으로 연결했습니다.",
-  "impact": "운영 화면, 사용자 매뉴얼, 기능 명세, 로컬 에이전트까지 포함해 실무형 백엔드/운영 도메인 역량을 보여줍니다.",
+  "summary": "입고, 적치, 재고, 출고 지시, 피킹 웨이브, DPS, PDA, 송장 출력까지 하나의 운영 흐름으로 연결한 WMS 포트폴리오입니다.",
   "stacks": ["Kotlin", "Spring Boot", "React", "TypeScript", "PostgreSQL", "Flyway", "Ktor", "Flutter"],
-  "highlights": [
-    "3PL 고객사/창고/SKU/로케이션 모델링",
-    "출고 지시 접수와 재고 할당",
-    "피킹 웨이브와 DPS WebSocket 연동",
-    "송장 PDF 렌더링과 로컬 프린트 에이전트"
-  ],
-  "interviewPoints": [
-    "회사 코드를 사용하지 않고 도메인 경험을 일반화해 재설계",
-    "중앙 서비스와 로컬 에이전트의 배포 단위 분리",
-    "화면 기반 제품 매뉴얼로 운영 흐름 설명 가능"
-  ],
+  "entryDocument": "docs/resume-portfolio.md",
   "coverImage": {
     "path": "docs/assets/portfolio/01-dashboard.png",
     "alt": "Warehouse Ops Suite 운영 현황 대시보드"
   },
   "documents": [
-    { "label": "이력서용 요약", "path": "docs/resume-portfolio.md", "type": "docs" },
+    { "label": "README", "path": "README.md", "type": "docs" },
     { "label": "제품 매뉴얼", "path": "docs/product-manual.md", "type": "manual" },
     { "label": "완성도 보고서", "path": "docs/portfolio-report.md", "type": "docs" }
   ],
