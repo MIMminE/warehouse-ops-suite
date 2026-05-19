@@ -33,7 +33,5 @@ jobs:
           cache: gradle
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 9.5.1
 
-      - run: gradle --no-daemon :apps:print-agent:test :apps:dps-protocol-agent:test
+      - run: ./gradlew --no-daemon :apps:print-agent:test :apps:dps-protocol-agent:test

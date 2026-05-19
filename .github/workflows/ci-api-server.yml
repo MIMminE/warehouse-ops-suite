@@ -31,7 +31,5 @@ jobs:
           cache: gradle
 
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 9.5.1
 
-      - run: gradle --no-daemon :services:api-server:test
+      - run: ./gradlew --no-daemon :services:api-server:test
