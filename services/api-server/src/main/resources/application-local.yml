@@ -15,3 +15,6 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   dps:
     websocket-url: ${DPS_AGENT_WEBSOCKET_URL:ws://localhost:4030/ws/dps}
+  print:
+    agent-url: ${PRINT_AGENT_URL:http://localhost:4020}
+    pdf-renderer-url: ${PDF_RENDERER_URL:http://localhost:4050}

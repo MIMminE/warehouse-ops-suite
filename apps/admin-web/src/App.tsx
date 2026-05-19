@@ -534,13 +534,13 @@ const waveInvoiceRows: WaveInvoiceRow[] = [
 
 const systemServiceRows = [
   { name: "API Server", endpoint: "http://localhost:8080", status: "설계 완료", note: "출고/입고/피킹 API" },
-  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "개발 중", note: "송장/피킹리스트 PDF 렌더링" },
+  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "연결 가능", note: "송장/피킹리스트 PDF 렌더링" },
 ];
 
 const localAgentRows = [
   { name: "DPS Protocol Agent", endpoint: "ws://localhost:4030/ws/dps", status: "연결 가능", note: "피킹 배치 시뮬레이터" },
-  { name: "Print Agent", endpoint: "http://localhost:4040", status: "예정", note: "송장 출력 큐" },
-  { name: "PDA Sync Client", endpoint: "Android local storage", status: "예정", note: "오프라인 작업 재전송 큐" },
+  { name: "Print Agent", endpoint: "http://localhost:4020", status: "연결 가능", note: "송장/피킹리스트 출력 큐" },
+  { name: "PDA Sync Client", endpoint: "Android local storage", status: "MVP", note: "입고/적치 작업 화면" },
 ];
 
 export function App() {
@@ -1064,6 +1064,7 @@ function PickingView() {
   const [waveRequester, setWaveRequester] = useState("운영자");
   const [waveMemo, setWaveMemo] = useState("Admin Web 생성");
   const [dpsDispatchResult, setDpsDispatchResult] = useState<string | null>(null);
+  const [printRequestResult, setPrintRequestResult] = useState<string | null>(null);
   const waveQueryParams = useMemo(
     () => ({
       clientCompanyId: clientIdByName[filters.client],
@@ -1152,10 +1153,18 @@ function PickingView() {
   const selectedPickingWave = rows.find((row) => row.wave === selectedWave) ?? rows[0];
   useEffect(() => {
     setDpsDispatchResult(null);
+    setPrintRequestResult(null);
   }, [selectedPickingWave?.wave]);
   const waveDetailQuery = useQuery({
     queryKey: ["outbound-wave-detail", selectedPickingWave?.id],
     queryFn: () => warehouseApi.getOutboundWaveDetail(selectedPickingWave?.id ?? 0),
+    enabled: Boolean(selectedPickingWave?.id),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const printJobsQuery = useQuery({
+    queryKey: ["outbound-wave-print-jobs", selectedPickingWave?.id],
+    queryFn: () => warehouseApi.getWavePrintJobs(selectedPickingWave?.id ?? 0),
     enabled: Boolean(selectedPickingWave?.id),
     retry: 1,
     staleTime: 15_000,
@@ -1173,6 +1182,18 @@ function PickingView() {
         queryClient.invalidateQueries({ queryKey: ["outbound-waves"] }),
         queryClient.invalidateQueries({ queryKey: ["outbound-wave-detail", response.waveId] }),
       ]);
+    },
+  });
+  const requestPickingListPrintMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedPickingWave?.id) {
+        throw new Error("출력할 웨이브를 선택해 주세요.");
+      }
+      return warehouseApi.requestPickingListPrint(selectedPickingWave.id);
+    },
+    onSuccess: async (job) => {
+      setPrintRequestResult(`${job.jobNo} 출력 요청 접수 · ${job.printerName ?? "프린터 미지정"} / ${job.status}`);
+      await queryClient.invalidateQueries({ queryKey: ["outbound-wave-print-jobs", job.outboundWaveId] });
     },
   });
   const apiWaveInvoices = waveDetailQuery.data?.pickingTasks.map((task) => ({
@@ -1306,12 +1327,53 @@ function PickingView() {
               DPS Agent 전송에 실패했습니다. 에이전트 실행 상태와 웨이브 작업 수량을 확인해 주세요.
             </p>
           )}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#dce5e3] bg-white px-3 py-3">
+            <div>
+              <p className="text-sm font-semibold text-[#24312f]">피킹리스트 출력</p>
+              <p className="mt-1 text-xs text-[#6b7780]">
+                PDF Renderer 문서 URL을 Print Agent 큐에 등록해 현장 출력 요청을 남깁니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!selectedPickingWave.id || requestPickingListPrintMutation.isPending}
+              onClick={() => requestPickingListPrintMutation.mutate()}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#cbd5d9] bg-white px-3 text-sm font-medium text-[#24312f] disabled:cursor-not-allowed disabled:bg-[#eef3f2] disabled:text-[#8a9794]"
+            >
+              <Download size={15} />
+              {requestPickingListPrintMutation.isPending ? "요청 중" : "피킹리스트 출력"}
+            </button>
+          </div>
+          {printRequestResult && (
+            <p className="mb-3 rounded-md border border-[#b9d9cf] bg-[#f0faf6] px-3 py-2 text-sm text-[#1b5e57]">
+              {printRequestResult}
+            </p>
+          )}
+          {requestPickingListPrintMutation.isError && (
+            <p className="mb-3 rounded-md border border-[#f3b4ad] bg-[#fff5f3] px-3 py-2 text-sm text-[#b42318]">
+              출력 요청에 실패했습니다. Print Agent와 PDF Renderer 실행 상태를 확인해 주세요.
+            </p>
+          )}
           <div className="mb-4 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
             <SummaryBox label="고객사" value={selectedPickingWave.client} />
             <SummaryBox label="작업 존" value={selectedPickingWave.zone} />
             <SummaryBox label="주문/작업" value={`${selectedPickingWave.orders} / ${selectedPickingWave.tasks}`} />
             <SummaryBox label="진행 상태" value={selectedPickingWave.status} />
           </div>
+          {(printJobsQuery.data?.length ?? 0) > 0 && (
+            <div className="mb-4">
+              <DataTable
+                columns={["출력작업", "문서", "프린터", "상태", "실패사유"]}
+                rows={(printJobsQuery.data ?? []).map((job) => [
+                  job.jobNo,
+                  job.documentType === "PICKING_LIST" ? "피킹리스트" : "송장",
+                  job.printerName ?? "-",
+                  <StatusPill key={`${job.jobNo}-status`} value={job.status === "FAILED" ? "실패" : job.status === "QUEUED" ? "대기" : job.status} />,
+                  job.failureReason ?? "-",
+                ])}
+              />
+            </div>
+          )}
           <DataTable
             columns={["송장번호", "출고번호", "고객사", "수취인", "상품", "로케이션", "지시", "피킹", "작업자", "상태"]}
             rows={selectedWaveInvoices.map((invoice) => [

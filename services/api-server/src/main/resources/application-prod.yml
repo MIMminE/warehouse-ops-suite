@@ -23,3 +23,6 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
   dps:
     websocket-url: ${DPS_AGENT_WEBSOCKET_URL}
+  print:
+    agent-url: ${PRINT_AGENT_URL}
+    pdf-renderer-url: ${PDF_RENDERER_URL}

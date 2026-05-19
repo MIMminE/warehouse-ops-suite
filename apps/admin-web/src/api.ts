@@ -264,6 +264,21 @@ export type ApiDpsDispatchResponse = {
   sentAt: string;
 };
 
+export type ApiPrintJob = {
+  id: number;
+  jobNo: string;
+  outboundWaveId: number | null;
+  outboundWaveNo: string | null;
+  pickingTaskId: number | null;
+  pickingTaskNo: string | null;
+  status: "REQUESTED" | "QUEUED" | "PRINTING" | "PRINTED" | "FAILED" | "CANCELED";
+  documentType: "INVOICE" | "PICKING_LIST";
+  printerName: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -317,5 +332,12 @@ export const warehouseApi = {
   dispatchOutboundWaveToDps: (waveId: number) =>
     request<ApiDpsDispatchResponse>(`/api/outbound-waves/${waveId}/dispatch-dps`, {
       method: "POST",
+    }),
+  getWavePrintJobs: (waveId: number) =>
+    request<ApiPrintJob[]>(`/api/outbound-waves/${waveId}/print-jobs`),
+  requestPickingListPrint: (waveId: number, printerName = "HP-LaserJet-PICK") =>
+    request<ApiPrintJob>(`/api/outbound-waves/${waveId}/print-jobs/picking-list`, {
+      method: "POST",
+      body: JSON.stringify({ printerName }),
     }),
 };
