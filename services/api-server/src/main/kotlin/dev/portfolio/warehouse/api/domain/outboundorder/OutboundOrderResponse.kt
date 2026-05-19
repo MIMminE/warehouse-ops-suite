@@ -6,7 +6,9 @@ import java.time.LocalDateTime
 data class OutboundOrderResponse(
     val id: Long,
     val clientCompanyId: Long,
+    val clientCompanyName: String,
     val warehouseId: Long,
+    val warehouseName: String,
     val outboundOrderNo: String,
     val externalReferenceNo: String?,
     val intakeSource: OutboundOrderIntakeSource,
@@ -20,6 +22,10 @@ data class OutboundOrderResponse(
     val requestedShipDate: LocalDate?,
     val orderedAt: LocalDateTime?,
     val createdAt: LocalDateTime,
+    val lineCount: Int,
+    val orderedQuantity: Int,
+    val allocatedQuantity: Int,
+    val pickedQuantity: Int,
 )
 
 data class OutboundOrderDetailResponse(
@@ -39,11 +45,13 @@ data class OutboundOrderLineResponse(
     val packedQuantity: Int,
 )
 
-fun OutboundOrderEntity.toResponse(): OutboundOrderResponse =
+fun OutboundOrderEntity.toResponse(lines: List<OutboundOrderLineEntity> = emptyList()): OutboundOrderResponse =
     OutboundOrderResponse(
         id = requireNotNull(id),
         clientCompanyId = requireNotNull(clientCompany.id),
+        clientCompanyName = clientCompany.name,
         warehouseId = requireNotNull(warehouse.id),
+        warehouseName = warehouse.name,
         outboundOrderNo = outboundOrderNo,
         externalReferenceNo = externalReferenceNo,
         intakeSource = intakeSource,
@@ -57,6 +65,10 @@ fun OutboundOrderEntity.toResponse(): OutboundOrderResponse =
         requestedShipDate = requestedShipDate,
         orderedAt = orderedAt,
         createdAt = createdAt,
+        lineCount = lines.size,
+        orderedQuantity = lines.sumOf { it.orderedQuantity },
+        allocatedQuantity = lines.sumOf { it.allocatedQuantity },
+        pickedQuantity = lines.sumOf { it.pickedQuantity },
     )
 
 fun OutboundOrderLineEntity.toResponse(): OutboundOrderLineResponse =
@@ -71,4 +83,3 @@ fun OutboundOrderLineEntity.toResponse(): OutboundOrderLineResponse =
         pickedQuantity = pickedQuantity,
         packedQuantity = packedQuantity,
     )
-

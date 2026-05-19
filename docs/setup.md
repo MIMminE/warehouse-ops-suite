@@ -22,6 +22,11 @@ pnpm install
 docker compose -f infra/docker-compose.yml up -d
 ```
 
+This starts local PostgreSQL and Redis for API Server development.
+
+- PostgreSQL: `localhost:5432`, database `warehouse_ops`
+- Redis: `localhost:6379`
+
 ## Run Web And Node Services
 
 ```bash
@@ -50,6 +55,8 @@ gradle :services:api-server:bootRun
 gradle :apps:print-agent:run
 gradle :apps:dps-protocol-agent:run
 ```
+
+Admin Web calls the API Server through `VITE_API_BASE_URL`. The local default is `http://localhost:8080`.
 
 The default API Server profile is `local` and expects PostgreSQL from Docker Compose. The `smoke` profile uses in-memory H2 so the server process can be checked without Docker.
 

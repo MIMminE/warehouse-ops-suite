@@ -19,8 +19,10 @@ import {
   Warehouse,
   X,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { type ApiOutboundOrderStatus, warehouseApi } from "./api";
 
 type AdminSection =
   | "dashboard"
@@ -130,6 +132,7 @@ type LocationCell = {
 };
 
 type OutboundRow = {
+  id?: number;
   no: string;
   client: string;
   warehouse: string;
@@ -203,6 +206,35 @@ const defaultFilters: OperationFilters = {
 
 const clientOptions = ["전체", "A 고객사", "B 고객사", "C 고객사"];
 const warehouseOptions = ["전체", "수도권 1센터", "부산 2센터"];
+const clientIdByName: Record<string, number> = {
+  "A 고객사": 1,
+  "B 고객사": 2,
+  "C 고객사": 3,
+};
+const outboundStatusToApi: Partial<Record<string, ApiOutboundOrderStatus>> = {
+  지시접수: "RECEIVED",
+  할당완료: "ALLOCATED",
+  피킹중: "PICKING",
+  피킹완료: "READY_TO_SHIP",
+  출고완료: "SHIPPED",
+  취소: "CANCELED",
+};
+const outboundStatusLabel: Record<ApiOutboundOrderStatus, string> = {
+  RECEIVED: "지시접수",
+  ALLOCATED: "할당완료",
+  WAVE_ASSIGNED: "웨이브할당",
+  PICKING: "피킹중",
+  PACKING: "패킹중",
+  READY_TO_SHIP: "피킹완료",
+  SHIPPED: "출고완료",
+  CANCELED: "취소",
+};
+const intakeSourceLabel = {
+  API: "API",
+  CSV_UPLOAD: "CSV",
+  EDI_FILE: "EDI",
+  MANUAL: "수기",
+} as const;
 
 const receivingRows: ReceivingRow[] = [
   {
@@ -739,7 +771,45 @@ function InventoryView() {
 
 function OutboundView() {
   const [filters, setFilters] = useState<OperationFilters>(defaultFilters);
-  const rows = filterByOperation(outboundRows, filters, (row) => row.requestedAt, [
+  const outboundQueryParams = useMemo(
+    () => ({
+      clientCompanyId: clientIdByName[filters.client],
+      status: outboundStatusToApi[filters.status],
+      requestedShipDateFrom: filters.fromDate,
+      requestedShipDateTo: filters.toDate,
+    }),
+    [filters.client, filters.fromDate, filters.status, filters.toDate],
+  );
+  const outboundOrdersQuery = useQuery({
+    queryKey: ["outbound-orders", outboundQueryParams],
+    queryFn: () => warehouseApi.searchOutboundOrders(outboundQueryParams),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const apiRows = useMemo<OutboundRow[] | null>(() => {
+    if (!outboundOrdersQuery.data) {
+      return null;
+    }
+
+    return outboundOrdersQuery.data.map((order) => ({
+      id: order.id,
+      no: order.outboundOrderNo,
+      client: order.clientCompanyName,
+      warehouse: order.warehouseName,
+      channel: intakeSourceLabel[order.intakeSource],
+      recipient: order.receiverName,
+      requestedAt: order.requestedShipDate ?? order.createdAt.slice(0, 10),
+      lines: order.orderedQuantity || order.lineCount,
+      allocated: order.allocatedQuantity,
+      picked: order.pickedQuantity,
+      status: outboundStatusLabel[order.status],
+    }));
+  }, [outboundOrdersQuery.data]);
+  const sourceRows = outboundOrdersQuery.isError || !apiRows ? outboundRows : apiRows;
+  const effectiveFilters = apiRows && !outboundOrdersQuery.isError
+    ? { ...filters, client: "전체", status: "전체" }
+    : filters;
+  const rows = filterByOperation(sourceRows, effectiveFilters, (row) => row.requestedAt, [
     "no",
     "client",
     "warehouse",
@@ -749,11 +819,40 @@ function OutboundView() {
   ]);
   const [selectedNo, setSelectedNo] = useState(rows[0]?.no ?? "");
   const selectedOrder = rows.find((row) => row.no === selectedNo) ?? rows[0];
-  const invoiceRows = selectedOrder ? outboundInvoiceRows.filter((invoice) => invoice.outboundNo === selectedOrder.no) : [];
+  const selectedOrderDetailQuery = useQuery({
+    queryKey: ["outbound-order-detail", selectedOrder?.id],
+    queryFn: () => warehouseApi.getOutboundOrderDetail(selectedOrder?.id ?? 0),
+    enabled: Boolean(selectedOrder?.id),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const apiInvoiceRows = selectedOrderDetailQuery.data?.lines.map((line) => ({
+    outboundNo: selectedOrderDetailQuery.data.order.outboundOrderNo,
+    invoiceNo: `LINE-${line.lineNo.toString().padStart(2, "0")}`,
+    sku: line.skuCode,
+    product: line.skuName,
+    quantity: line.orderedQuantity,
+    allocated: line.allocatedQuantity,
+    picked: line.pickedQuantity,
+    carrier: "미지정",
+    printStatus: line.packedQuantity > 0 ? "출력대기" : "미생성",
+  }));
+  const invoiceRows = selectedOrder
+    ? apiInvoiceRows ?? outboundInvoiceRows.filter((invoice) => invoice.outboundNo === selectedOrder.no)
+    : [];
+  const dataModeLabel = outboundOrdersQuery.isError
+    ? "API 연결 실패 / 데모 데이터 표시"
+    : outboundOrdersQuery.isFetching
+      ? "API 동기화 중"
+      : "API 데이터";
 
   return (
     <div className="grid gap-5">
       <ResultToolbar count={rows.length} label="출고 지시" actions={["지시 등록", "일괄 할당", "엑셀"]} />
+      <div className="flex items-center justify-between rounded-md border border-[#d7dee2] bg-white px-4 py-3 text-sm max-sm:block">
+        <span className="font-medium text-[#2f3a42]">데이터 소스</span>
+        <span className={outboundOrdersQuery.isError ? "text-[#b42318]" : "text-[#1b5e57]"}>{dataModeLabel}</span>
+      </div>
       <CompactFilterBar
         filters={filters}
         onChange={setFilters}

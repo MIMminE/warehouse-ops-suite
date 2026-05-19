@@ -3,3 +3,13 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/warehouse_ops}
     username: ${DATABASE_USERNAME:warehouse}
     password: ${DATABASE_PASSWORD:warehouse}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  flyway:
+    locations: classpath:db/migration,classpath:db/local
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
