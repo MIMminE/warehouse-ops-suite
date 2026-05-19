@@ -193,6 +193,24 @@ export type ApiOutboundWave = {
   pickingTasks: ApiOutboundWavePickingTask[];
 };
 
+export type ApiOutboundWaveCandidateLine = {
+  outboundOrderLineId: number;
+  outboundOrderNo: string;
+  clientCompanyId: number;
+  clientCompanyName: string;
+  warehouseId: number;
+  warehouseName: string;
+  receiverName: string;
+  skuId: number;
+  skuCode: string;
+  skuName: string;
+  orderedQuantity: number;
+  allocatedQuantity: number;
+  pickedQuantity: number;
+  candidateQuantity: number;
+  requestedShipDate: string | null;
+};
+
 export type OutboundOrderSearchParams = {
   clientCompanyId?: number;
   status?: ApiOutboundOrderStatus;
@@ -223,10 +241,27 @@ export type OutboundWaveSearchParams = {
   createdTo?: string;
 };
 
+export type OutboundWaveCandidateParams = {
+  clientCompanyId?: number;
+  warehouseId?: number;
+};
+
+export type CreateOutboundWaveRequest = {
+  waveNo: string;
+  clientCompanyId: number;
+  warehouseId: number;
+  requestedBy: string;
+  memo?: string;
+  outboundOrderLineIds: number[];
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
-const request = async <T>(path: string): Promise<T> => {
-  const response = await fetch(`${apiBaseUrl}${path}`);
+const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    headers: init?.body ? { "content-type": "application/json", ...init.headers } : init?.headers,
+    ...init,
+  });
 
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
@@ -263,4 +298,11 @@ export const warehouseApi = {
     request<ApiOutboundWave[]>(`/api/outbound-waves${toQueryString(params)}`),
   getOutboundWaveDetail: (waveId: number) =>
     request<ApiOutboundWave>(`/api/outbound-waves/${waveId}`),
+  getOutboundWaveCandidates: (params: OutboundWaveCandidateParams) =>
+    request<ApiOutboundWaveCandidateLine[]>(`/api/outbound-waves/candidates${toQueryString(params)}`),
+  createOutboundWave: (payload: CreateOutboundWaveRequest) =>
+    request<ApiOutboundWave>("/api/outbound-waves", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

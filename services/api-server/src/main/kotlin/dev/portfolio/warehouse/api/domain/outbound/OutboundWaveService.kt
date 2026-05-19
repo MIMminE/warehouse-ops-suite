@@ -27,6 +27,27 @@ class OutboundWaveService(
     private val pickingTaskRepository: PickingTaskRepository,
 ) {
     @Transactional(readOnly = true)
+    fun getCandidates(
+        clientCompanyId: Long?,
+        warehouseId: Long?,
+    ): List<OutboundWaveCandidateLineResponse> =
+        outboundOrderLineRepository.findAll()
+            .asSequence()
+            .filter { it.allocatedQuantity > it.pickedQuantity }
+            .filter { clientCompanyId == null || it.outboundOrder.clientCompany.id == clientCompanyId }
+            .filter { warehouseId == null || it.outboundOrder.warehouse.id == warehouseId }
+            .filter { !pickingTaskRepository.existsByOutboundOrderLineId(requireNotNull(it.id)) }
+            .sortedWith(
+                compareBy(
+                    { it.outboundOrder.requestedShipDate },
+                    { it.outboundOrder.id },
+                    { it.lineNo },
+                ),
+            )
+            .map { it.toWaveCandidateResponse() }
+            .toList()
+
+    @Transactional(readOnly = true)
     fun search(
         clientCompanyId: Long?,
         warehouseId: Long?,

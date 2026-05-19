@@ -41,6 +41,16 @@ class OutboundWaveController(
             createdTo = createdTo,
         )
 
+    @GetMapping("/candidates")
+    fun getCandidates(
+        @RequestParam(required = false) clientCompanyId: Long?,
+        @RequestParam(required = false) warehouseId: Long?,
+    ): List<OutboundWaveCandidateLineResponse> =
+        outboundWaveService.getCandidates(
+            clientCompanyId = clientCompanyId,
+            warehouseId = warehouseId,
+        )
+
     @GetMapping("/{waveId}")
     fun getDetail(
         @PathVariable waveId: Long,

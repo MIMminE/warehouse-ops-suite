@@ -2,6 +2,25 @@ package dev.portfolio.warehouse.api.domain.outbound
 
 import dev.portfolio.warehouse.api.domain.picking.PickingTaskEntity
 import dev.portfolio.warehouse.api.domain.picking.PickingTaskStatus
+import dev.portfolio.warehouse.api.domain.outboundorder.OutboundOrderLineEntity
+
+data class OutboundWaveCandidateLineResponse(
+    val outboundOrderLineId: Long,
+    val outboundOrderNo: String,
+    val clientCompanyId: Long,
+    val clientCompanyName: String,
+    val warehouseId: Long,
+    val warehouseName: String,
+    val receiverName: String,
+    val skuId: Long,
+    val skuCode: String,
+    val skuName: String,
+    val orderedQuantity: Int,
+    val allocatedQuantity: Int,
+    val pickedQuantity: Int,
+    val candidateQuantity: Int,
+    val requestedShipDate: String?,
+)
 
 data class OutboundWaveResponse(
     val id: Long,
@@ -71,4 +90,23 @@ fun PickingTaskEntity.toWaveResponse(): OutboundWavePickingTaskResponse =
         requestedQuantity = requestedQuantity,
         pickedQuantity = pickedQuantity,
         assignedWorker = assignedWorker,
+    )
+
+fun OutboundOrderLineEntity.toWaveCandidateResponse(): OutboundWaveCandidateLineResponse =
+    OutboundWaveCandidateLineResponse(
+        outboundOrderLineId = requireNotNull(id),
+        outboundOrderNo = outboundOrder.outboundOrderNo,
+        clientCompanyId = requireNotNull(outboundOrder.clientCompany.id),
+        clientCompanyName = outboundOrder.clientCompany.name,
+        warehouseId = requireNotNull(outboundOrder.warehouse.id),
+        warehouseName = outboundOrder.warehouse.name,
+        receiverName = outboundOrder.receiverName,
+        skuId = requireNotNull(sku.id),
+        skuCode = sku.code,
+        skuName = sku.name,
+        orderedQuantity = orderedQuantity,
+        allocatedQuantity = allocatedQuantity,
+        pickedQuantity = pickedQuantity,
+        candidateQuantity = allocatedQuantity - pickedQuantity,
+        requestedShipDate = outboundOrder.requestedShipDate?.toString(),
     )

@@ -19,7 +19,7 @@ import {
   Warehouse,
   X,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { type ApiOutboundOrderStatus, type ApiOutboundWaveStatus, type ApiReceivingOrderStatus, warehouseApi } from "./api";
@@ -1055,10 +1055,14 @@ function OutboundView() {
 }
 
 function PickingView() {
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<OperationFilters>({
     ...defaultFilters,
     warehouse: "전체",
   });
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
+  const [waveRequester, setWaveRequester] = useState("운영자");
+  const [waveMemo, setWaveMemo] = useState("Admin Web 생성");
   const waveQueryParams = useMemo(
     () => ({
       clientCompanyId: clientIdByName[filters.client],
@@ -1074,6 +1078,44 @@ function PickingView() {
     queryFn: () => warehouseApi.searchOutboundWaves(waveQueryParams),
     retry: 1,
     staleTime: 15_000,
+  });
+  const candidatesQuery = useQuery({
+    queryKey: ["outbound-wave-candidates", filters.client, filters.warehouse],
+    queryFn: () => warehouseApi.getOutboundWaveCandidates({
+      clientCompanyId: clientIdByName[filters.client],
+      warehouseId: warehouseIdByName[filters.warehouse],
+    }),
+    retry: 1,
+    staleTime: 15_000,
+  });
+  const createWaveMutation = useMutation({
+    mutationFn: () => {
+      const selectedCandidates = candidatesQuery.data?.filter((candidate) =>
+        selectedCandidateIds.includes(candidate.outboundOrderLineId),
+      ) ?? [];
+      const first = selectedCandidates[0];
+      if (!first) {
+        throw new Error("웨이브 생성 후보를 선택해 주세요.");
+      }
+
+      return warehouseApi.createOutboundWave({
+        waveNo: `WAVE-${new Date().toISOString().slice(2, 10).replaceAll("-", "")}-${Date.now().toString().slice(-4)}`,
+        clientCompanyId: first.clientCompanyId,
+        warehouseId: first.warehouseId,
+        requestedBy: waveRequester,
+        memo: waveMemo,
+        outboundOrderLineIds: selectedCandidateIds,
+      });
+    },
+    onSuccess: async (wave) => {
+      setSelectedCandidateIds([]);
+      setSelectedWave(wave.waveNo);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["outbound-waves"] }),
+        queryClient.invalidateQueries({ queryKey: ["outbound-wave-candidates"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
+    },
   });
   const apiRows = useMemo<PickingRow[] | null>(() => {
     if (!wavesQuery.data) {
@@ -1137,6 +1179,24 @@ function PickingView() {
     : wavesQuery.isFetching
       ? "API 동기화 중"
       : "API 데이터";
+  const candidateRows = candidatesQuery.data ?? [];
+  const selectedCandidateSet = new Set(selectedCandidateIds);
+  const toggleCandidate = (lineId: number) => {
+    setSelectedCandidateIds((current) =>
+      current.includes(lineId)
+        ? current.filter((id) => id !== lineId)
+        : [...current, lineId],
+    );
+  };
+  const selectedCandidateLines = candidateRows.filter((candidate) =>
+    selectedCandidateSet.has(candidate.outboundOrderLineId),
+  );
+  const canCreateWave =
+    selectedCandidateLines.length > 0 &&
+    selectedCandidateLines.every((candidate) =>
+      candidate.clientCompanyId === selectedCandidateLines[0].clientCompanyId &&
+      candidate.warehouseId === selectedCandidateLines[0].warehouseId,
+    );
 
   return (
     <div className="grid gap-5">
@@ -1149,6 +1209,52 @@ function PickingView() {
         keywordPlaceholder="웨이브, 존, 고객사"
         fields={["client", "warehouse", "status", "date", "keyword"]}
       />
+      <SectionPanel title="웨이브 생성 후보" action={`${candidateRows.length}건`}>
+        <div className="grid gap-4">
+          <div className="grid grid-cols-[1fr_160px_160px_auto] gap-3 max-lg:grid-cols-1">
+            <TextField label="요청자" value={waveRequester} placeholder="요청자" onChange={setWaveRequester} compact />
+            <TextField label="메모" value={waveMemo} placeholder="웨이브 메모" onChange={setWaveMemo} compact />
+            <SummaryBox label="선택 수량" value={`${selectedCandidateLines.reduce((total, row) => total + row.candidateQuantity, 0).toLocaleString()}개`} />
+            <button
+              type="button"
+              disabled={!canCreateWave || createWaveMutation.isPending}
+              onClick={() => createWaveMutation.mutate()}
+              className="h-10 self-end rounded-md bg-[#1b5e57] px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-[#9fb5b1]"
+            >
+              {createWaveMutation.isPending ? "생성 중" : "선택 라인으로 생성"}
+            </button>
+          </div>
+          {createWaveMutation.isError && (
+            <p className="rounded-md border border-[#f3b4ad] bg-[#fff5f3] px-3 py-2 text-sm text-[#b42318]">
+              웨이브 생성에 실패했습니다. 선택한 라인의 고객사와 창고가 같은지 확인해 주세요.
+            </p>
+          )}
+          <DataTable
+            columns={["선택", "출고번호", "고객사", "수취인", "상품", "요청일", "할당", "후보"]}
+            rows={candidateRows.map((candidate) => [
+              <input
+                key={candidate.outboundOrderLineId}
+                type="checkbox"
+                checked={selectedCandidateSet.has(candidate.outboundOrderLineId)}
+                onChange={() => toggleCandidate(candidate.outboundOrderLineId)}
+                className="h-4 w-4 accent-[#1b5e57]"
+              />,
+              candidate.outboundOrderNo,
+              candidate.clientCompanyName,
+              candidate.receiverName,
+              <SkuCell key={`${candidate.outboundOrderLineId}-sku`} sku={candidate.skuCode} name={candidate.skuName} />,
+              candidate.requestedShipDate ?? "-",
+              candidate.allocatedQuantity.toLocaleString(),
+              candidate.candidateQuantity.toLocaleString(),
+            ])}
+          />
+          {!candidateRows.length && (
+            <p className="rounded-md border border-dashed border-[#cbd5d9] py-6 text-center text-sm text-[#6b7780]">
+              웨이브로 생성할 수 있는 할당 완료 라인이 없습니다.
+            </p>
+          )}
+        </div>
+      </SectionPanel>
       <SectionPanel title="출고 웨이브 및 피킹 작업" action="작업자 배정">
         <PickingWaveTable rows={rows} selectedWave={selectedPickingWave?.wave ?? ""} onSelect={setSelectedWave} />
       </SectionPanel>
