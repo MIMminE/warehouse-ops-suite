@@ -255,6 +255,15 @@ export type CreateOutboundWaveRequest = {
   outboundOrderLineIds: number[];
 };
 
+export type ApiDpsDispatchResponse = {
+  waveId: number;
+  waveNo: string;
+  requestId: string;
+  agentResponseType: string;
+  cellCount: number;
+  sentAt: string;
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -304,5 +313,9 @@ export const warehouseApi = {
     request<ApiOutboundWave>("/api/outbound-waves", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  dispatchOutboundWaveToDps: (waveId: number) =>
+    request<ApiDpsDispatchResponse>(`/api/outbound-waves/${waveId}/dispatch-dps`, {
+      method: "POST",
     }),
 };

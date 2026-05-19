@@ -1063,6 +1063,7 @@ function PickingView() {
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<number[]>([]);
   const [waveRequester, setWaveRequester] = useState("운영자");
   const [waveMemo, setWaveMemo] = useState("Admin Web 생성");
+  const [dpsDispatchResult, setDpsDispatchResult] = useState<string | null>(null);
   const waveQueryParams = useMemo(
     () => ({
       clientCompanyId: clientIdByName[filters.client],
@@ -1149,12 +1150,30 @@ function PickingView() {
     "status",
   ]);
   const selectedPickingWave = rows.find((row) => row.wave === selectedWave) ?? rows[0];
+  useEffect(() => {
+    setDpsDispatchResult(null);
+  }, [selectedPickingWave?.wave]);
   const waveDetailQuery = useQuery({
     queryKey: ["outbound-wave-detail", selectedPickingWave?.id],
     queryFn: () => warehouseApi.getOutboundWaveDetail(selectedPickingWave?.id ?? 0),
     enabled: Boolean(selectedPickingWave?.id),
     retry: 1,
     staleTime: 15_000,
+  });
+  const dispatchDpsMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedPickingWave?.id) {
+        throw new Error("DPS로 전송할 웨이브를 선택해 주세요.");
+      }
+      return warehouseApi.dispatchOutboundWaveToDps(selectedPickingWave.id);
+    },
+    onSuccess: async (response) => {
+      setDpsDispatchResult(`${response.waveNo} 전송 완료 · ${response.cellCount}개 셀 점등 요청`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["outbound-waves"] }),
+        queryClient.invalidateQueries({ queryKey: ["outbound-wave-detail", response.waveId] }),
+      ]);
+    },
   });
   const apiWaveInvoices = waveDetailQuery.data?.pickingTasks.map((task) => ({
     wave: waveDetailQuery.data.waveNo,
@@ -1260,6 +1279,33 @@ function PickingView() {
       </SectionPanel>
       {selectedPickingWave && (
         <SectionPanel title={`${selectedPickingWave.wave} 포함 송장`} action={`${selectedWaveInvoices.length}건`}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#dce5e3] bg-[#f8fbfa] px-3 py-3">
+            <div>
+              <p className="text-sm font-semibold text-[#24312f]">DPS 작업 전송</p>
+              <p className="mt-1 text-xs text-[#6b7780]">
+                선택한 웨이브의 피킹 작업을 DPS Protocol Agent로 보내 셀 점등 작업을 시작합니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={!selectedPickingWave.id || selectedPickingWave.zone !== "DPS" || dispatchDpsMutation.isPending}
+              onClick={() => dispatchDpsMutation.mutate()}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-[#1b5e57] px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-[#9fb5b1]"
+            >
+              <Send size={15} />
+              {dispatchDpsMutation.isPending ? "전송 중" : "DPS 전송"}
+            </button>
+          </div>
+          {dpsDispatchResult && (
+            <p className="mb-3 rounded-md border border-[#b9d9cf] bg-[#f0faf6] px-3 py-2 text-sm text-[#1b5e57]">
+              {dpsDispatchResult}
+            </p>
+          )}
+          {dispatchDpsMutation.isError && (
+            <p className="mb-3 rounded-md border border-[#f3b4ad] bg-[#fff5f3] px-3 py-2 text-sm text-[#b42318]">
+              DPS Agent 전송에 실패했습니다. 에이전트 실행 상태와 웨이브 작업 수량을 확인해 주세요.
+            </p>
+          )}
           <div className="mb-4 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
             <SummaryBox label="고객사" value={selectedPickingWave.client} />
             <SummaryBox label="작업 존" value={selectedPickingWave.zone} />
