@@ -51,6 +51,8 @@ See [docs/portfolio-report.md](docs/portfolio-report.md) for the current complet
 
 For a resume-oriented project write-up with actual Admin Web screenshots, see [docs/resume-portfolio.md](docs/resume-portfolio.md).
 
+For a screen-based user manual and functional specification, see [docs/product-manual.md](docs/product-manual.md).
+
 ## First Implementation Target
 
 Outbound wave creation -> DPS picking start -> PDA picking complete -> invoice PDF creation -> Print Agent print request -> print status tracking.
