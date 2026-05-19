@@ -46,7 +46,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         if: ${{ inputs.component == 'api-server' || inputs.component == 'print-agent' || inputs.component == 'dps-protocol-agent' }}
         with:
-          gradle-version: 9.3.0
+          gradle-version: 9.5.1
 
       - uses: subosito/flutter-action@v2
         if: ${{ inputs.component == 'pda-app' }}
