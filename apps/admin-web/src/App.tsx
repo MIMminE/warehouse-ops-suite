@@ -467,7 +467,7 @@ const waveInvoiceRows: WaveInvoiceRow[] = [
 
 const systemServiceRows = [
   { name: "API Server", endpoint: "http://localhost:8080", status: "설계 완료", note: "출고/입고/피킹 API" },
-  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "예정", note: "송장/Picking List 렌더링" },
+  { name: "PDF Renderer", endpoint: "http://localhost:4050", status: "개발 중", note: "송장/피킹리스트 PDF 렌더링" },
 ];
 
 const localAgentRows = [

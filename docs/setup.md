@@ -29,6 +29,20 @@ pnpm dev:admin
 pnpm dev:pdf
 ```
 
+The PDF Renderer uses Playwright Chromium for PDF generation. Install the browser runtime once after installing Node packages:
+
+```bash
+pnpm --filter @warehouse/pdf-renderer exec playwright install chromium
+```
+
+Useful local PDF Renderer checks:
+
+```bash
+curl http://127.0.0.1:4050/health
+curl 'http://127.0.0.1:4050/samples/invoice?format=html'
+curl 'http://127.0.0.1:4050/samples/picking-list?format=html'
+```
+
 ## Run Kotlin Services
 
 ```bash
