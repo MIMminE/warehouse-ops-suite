@@ -49,6 +49,8 @@ See [docs/setup.md](docs/setup.md).
 
 See [docs/portfolio-report.md](docs/portfolio-report.md) for the current completion report, demo scenario, and remaining production-grade extensions.
 
+For a resume-oriented project write-up with actual Admin Web screenshots, see [docs/resume-portfolio.md](docs/resume-portfolio.md).
+
 ## First Implementation Target
 
 Outbound wave creation -> DPS picking start -> PDA picking complete -> invoice PDF creation -> Print Agent print request -> print status tracking.
