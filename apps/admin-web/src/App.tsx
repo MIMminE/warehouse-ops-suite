@@ -166,6 +166,22 @@ type InvoiceRow = {
   printStatus: string;
 };
 
+type WaveInvoiceRow = {
+  wave: string;
+  invoiceNo: string;
+  outboundNo: string;
+  client: string;
+  recipient: string;
+  sku: string;
+  product: string;
+  location: string;
+  quantity: number;
+  picked: number;
+  worker: string;
+  device: string;
+  status: string;
+};
+
 const navItems: Array<{ id: AdminSection; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "운영 현황", icon: LayoutDashboard },
   { id: "receiving", label: "입고/적치", icon: PackageCheck },
@@ -437,6 +453,16 @@ const pickingRows: PickingRow[] = [
     picked: 0,
     status: "대기",
   },
+];
+
+const waveInvoiceRows: WaveInvoiceRow[] = [
+  { wave: "WAVE-0518-AM-01", invoiceNo: "INV-260518-0001", outboundNo: "OUT-20260518-0801", client: "A 고객사", recipient: "김서연", sku: "SKU-4012", product: "Basic Tee / Black", location: "A-01-03", quantity: 2, picked: 2, worker: "최유진", device: "PDA-05", status: "완료" },
+  { wave: "WAVE-0518-AM-01", invoiceNo: "INV-260518-0002", outboundNo: "OUT-20260518-0801", client: "A 고객사", recipient: "김서연", sku: "SKU-1024", product: "Slim Bottle / Clear", location: "C-04-05", quantity: 1, picked: 1, worker: "최유진", device: "PDA-05", status: "완료" },
+  { wave: "WAVE-0518-AM-01", invoiceNo: "INV-260518-0003", outboundNo: "OUT-20260518-0801", client: "A 고객사", recipient: "김서연", sku: "SKU-7780", product: "Pouch Set / Gray", location: "D-01-02", quantity: 3, picked: 0, worker: "문하늘", device: "PDA-06", status: "진행중" },
+  { wave: "WAVE-0518-AM-02", invoiceNo: "INV-260518-0004", outboundNo: "OUT-20260518-0802", client: "B 고객사", recipient: "박민준", sku: "SKU-8801", product: "Daily Cap / Navy", location: "B-02-01", quantity: 1, picked: 1, worker: "오세린", device: "PDA-03", status: "완료" },
+  { wave: "WAVE-0518-AM-02", invoiceNo: "INV-260518-0005", outboundNo: "OUT-20260518-0802", client: "B 고객사", recipient: "박민준", sku: "SKU-4012", product: "Basic Tee / Black", location: "A-01-03", quantity: 4, picked: 4, worker: "오세린", device: "PDA-03", status: "완료" },
+  { wave: "WAVE-0518-PM-01", invoiceNo: "INV-260519-0006", outboundNo: "OUT-20260518-0803", client: "C 고객사", recipient: "이하은", sku: "SKU-7780", product: "Pouch Set / Gray", location: "D-01-02", quantity: 6, picked: 0, worker: "DPS", device: "DPS-AGENT", status: "대기" },
+  { wave: "WAVE-0518-PM-01", invoiceNo: "INV-260519-0007", outboundNo: "OUT-20260519-0804", client: "A 고객사", recipient: "최도윤", sku: "SKU-1024", product: "Slim Bottle / Clear", location: "C-04-05", quantity: 2, picked: 0, worker: "DPS", device: "DPS-AGENT", status: "대기" },
 ];
 
 const agentRows = [
@@ -765,6 +791,7 @@ function PickingView() {
     ...defaultFilters,
     warehouse: "전체",
   });
+  const [selectedWave, setSelectedWave] = useState(pickingRows[0]?.wave ?? "");
   const rows = filterByOperation(pickingRows, filters, (row) => row.startedAt, [
     "wave",
     "client",
@@ -772,6 +799,10 @@ function PickingView() {
     "zone",
     "status",
   ]);
+  const selectedPickingWave = rows.find((row) => row.wave === selectedWave) ?? rows[0];
+  const selectedWaveInvoices = selectedPickingWave
+    ? waveInvoiceRows.filter((invoice) => invoice.wave === selectedPickingWave.wave)
+    : [];
 
   return (
     <div className="grid gap-5">
@@ -784,22 +815,33 @@ function PickingView() {
         fields={["client", "warehouse", "status", "date", "keyword"]}
       />
       <SectionPanel title="출고 웨이브 및 피킹 작업" action="작업자 배정">
-        <DataTable
-          columns={["웨이브", "고객사", "창고", "존", "시작일", "주문", "작업", "완료", "진행률", "상태"]}
-          rows={rows.map((row) => [
-            row.wave,
-            row.client,
-            row.warehouse,
-            row.zone,
-            row.startedAt,
-            row.orders.toLocaleString(),
-            row.tasks.toLocaleString(),
-            row.picked.toLocaleString(),
-            <ProgressBar key={`${row.wave}-progress`} value={row.tasks ? Math.round((row.picked / row.tasks) * 100) : 0} />,
-            <StatusPill key={row.wave} value={row.status} />,
-          ])}
-        />
+        <PickingWaveTable rows={rows} selectedWave={selectedPickingWave?.wave ?? ""} onSelect={setSelectedWave} />
       </SectionPanel>
+      {selectedPickingWave && (
+        <SectionPanel title={`${selectedPickingWave.wave} 포함 송장`} action={`${selectedWaveInvoices.length}건`}>
+          <div className="mb-4 grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+            <SummaryBox label="고객사" value={selectedPickingWave.client} />
+            <SummaryBox label="작업 존" value={selectedPickingWave.zone} />
+            <SummaryBox label="주문/작업" value={`${selectedPickingWave.orders} / ${selectedPickingWave.tasks}`} />
+            <SummaryBox label="진행 상태" value={selectedPickingWave.status} />
+          </div>
+          <DataTable
+            columns={["송장번호", "출고번호", "고객사", "수취인", "상품", "로케이션", "지시", "피킹", "작업자", "상태"]}
+            rows={selectedWaveInvoices.map((invoice) => [
+              invoice.invoiceNo,
+              invoice.outboundNo,
+              invoice.client,
+              invoice.recipient,
+              <SkuCell key={invoice.invoiceNo} sku={invoice.sku} name={invoice.product} />,
+              invoice.location,
+              invoice.quantity.toLocaleString(),
+              invoice.picked.toLocaleString(),
+              `${invoice.worker} / ${invoice.device}`,
+              <StatusPill key={`${invoice.invoiceNo}-status`} value={invoice.status} />,
+            ])}
+          />
+        </SectionPanel>
+      )}
     </div>
   );
 }
@@ -1218,6 +1260,70 @@ function OutboundOrderTable({
             <tr>
               <td className="px-3 py-10 text-center text-sm text-[#6b7780]" colSpan={11}>
                 조회 조건에 맞는 출고 지시가 없습니다.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PickingWaveTable({
+  rows,
+  selectedWave,
+  onSelect,
+}: {
+  rows: PickingRow[];
+  selectedWave: string;
+  onSelect: (wave: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-[#d7dee2] text-xs uppercase text-[#6b7780]">
+            {["웨이브", "고객사", "창고", "존", "시작일", "주문", "작업", "완료", "송장", "진행률", "상태"].map((column) => (
+              <th key={column} className="px-3 py-3 font-medium">
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const selected = row.wave === selectedWave;
+            const invoiceCount = waveInvoiceRows.filter((invoice) => invoice.wave === row.wave).length;
+            return (
+              <tr
+                key={row.wave}
+                onClick={() => onSelect(row.wave)}
+                className={`cursor-pointer border-b border-[#edf1f2] last:border-b-0 ${
+                  selected ? "bg-[#e6f0ee]" : "hover:bg-[#f8faf9]"
+                }`}
+              >
+                <td className="px-3 py-3 font-medium text-[#1b5e57]">{row.wave}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.client}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.warehouse}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.zone}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.startedAt}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.orders.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.tasks.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{row.picked.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">{invoiceCount.toLocaleString()}</td>
+                <td className="px-3 py-3 text-[#2f3a42]">
+                  <ProgressBar value={row.tasks ? Math.round((row.picked / row.tasks) * 100) : 0} />
+                </td>
+                <td className="px-3 py-3 text-[#2f3a42]">
+                  <StatusPill value={row.status} />
+                </td>
+              </tr>
+            );
+          })}
+          {!rows.length && (
+            <tr>
+              <td className="px-3 py-10 text-center text-sm text-[#6b7780]" colSpan={11}>
+                조회 조건에 맞는 피킹 웨이브가 없습니다.
               </td>
             </tr>
           )}
