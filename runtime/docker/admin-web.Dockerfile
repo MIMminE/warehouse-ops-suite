@@ -19,4 +19,5 @@ RUN pnpm --filter @warehouse/admin-web build
 
 FROM nginx:1.27-alpine
 COPY --from=build /workspace/apps/admin-web/dist /usr/share/nginx/html
+RUN printf 'ok\n' > /usr/share/nginx/html/health
 EXPOSE 80

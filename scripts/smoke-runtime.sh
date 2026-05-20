@@ -52,7 +52,7 @@ done
 
 for attempt in $(seq 1 90); do
   if curl -fsS http://localhost:8080/actuator/health >/dev/null \
-    && curl -fsS http://localhost:4173 >/dev/null \
+    && curl -fsS http://localhost:4173/health >/dev/null \
     && curl -fsS http://localhost:4050/health >/dev/null; then
     echo "Runtime smoke test passed."
     exit 0
