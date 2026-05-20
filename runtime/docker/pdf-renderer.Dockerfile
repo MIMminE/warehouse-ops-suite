@@ -6,11 +6,10 @@ COPY services/pdf-renderer/package.json services/pdf-renderer/package.json
 RUN pnpm install --frozen-lockfile
 COPY services/pdf-renderer services/pdf-renderer
 RUN pnpm --filter @warehouse/pdf-renderer build
+RUN pnpm --filter @warehouse/pdf-renderer deploy --prod /pdf-renderer
 
 FROM mcr.microsoft.com/playwright:v1.49.1-jammy
 WORKDIR /app
-COPY --from=build /workspace/node_modules ./node_modules
-COPY --from=build /workspace/services/pdf-renderer/package.json ./package.json
-COPY --from=build /workspace/services/pdf-renderer/dist ./dist
+COPY --from=build /pdf-renderer ./
 EXPOSE 4050
 CMD ["node", "dist/server.js"]
