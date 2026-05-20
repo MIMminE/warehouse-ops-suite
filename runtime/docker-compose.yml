@@ -9,6 +9,11 @@ services:
       - "15433:5432"
     volumes:
       - warehouse-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse -d warehouse_ops"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7.4-alpine
@@ -17,14 +22,21 @@ services:
       - "16379:6379"
     volumes:
       - warehouse-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   api-server:
     build:
       context: ..
       dockerfile: runtime/docker/api-server.Dockerfile
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DATABASE_URL: jdbc:postgresql://postgres:5432/warehouse_ops
@@ -38,6 +50,12 @@ services:
       PDF_RENDERER_URL: http://pdf-renderer:4050
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
 
   admin-web:
     build:
@@ -49,9 +67,15 @@ services:
         VITE_PDF_RENDERER_URL: http://localhost:4050
         VITE_PRINT_AGENT_URL: http://localhost:4020
     depends_on:
-      - api-server
+      api-server:
+        condition: service_healthy
     ports:
       - "4173:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   pdf-renderer:
     build:
@@ -59,6 +83,11 @@ services:
       dockerfile: runtime/docker/pdf-renderer.Dockerfile
     ports:
       - "4050:4050"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4050/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   print-agent:
     build:
@@ -66,6 +95,12 @@ services:
       dockerfile: runtime/docker/print-agent.Dockerfile
     ports:
       - "4020:4020"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4020/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
 
   dps-protocol-agent:
     build:
@@ -73,6 +108,12 @@ services:
       dockerfile: runtime/docker/dps-protocol-agent.Dockerfile
     ports:
       - "4030:4030"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4030/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
 
 volumes:
   warehouse-postgres-data:

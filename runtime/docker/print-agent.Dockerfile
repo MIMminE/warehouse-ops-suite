@@ -6,6 +6,7 @@ RUN ./gradlew --no-daemon :apps:print-agent:jar
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /workspace/apps/print-agent/build/libs/*.jar app.jar
 EXPOSE 4020
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
